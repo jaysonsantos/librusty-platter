@@ -17,12 +17,6 @@ script:
   travis-cargo test &&
   travis-cargo bench &&
   travis-cargo --only stable doc
-# addons:
-#   apt:
-#     packages:
-#     - libcurl4-openssl-dev
-#     - libelf-dev
-#     - libdw-dev
 after_success:
 - travis-cargo --only stable doc-upload
 - travis-cargo coveralls --no-sudo
@@ -32,4 +26,5 @@ notifications:
 env:
   global:
   - TRAVIS_CARGO_NIGHTLY_FEATURE=dev
-  - secure: # encrypted stuff
+  - secure:
+  - secure: y4W0JjW9BStnrvkONeBSnUYlXGrqBmNKF1m9jtVA2aghViuDkgfDp3YbVH9itHKMYvR9nZC7HOJsrfWyxcEPSQFdz8/KOfAemxZSWMhhLo23bEgViKi52cjymKBPOHeoX36bN72nOrqdG21tP9fEv9iF7CoixHz4tfsAemFwsmydBFnXhEDuA1ruR5t3nyUHZobIz0cAJ+xLWd520R/NkhJ9CoroD16YdpgmJUBDwNK0HOWuySDLOZBcgIjxU/pYdDnrNH549aIf3szHJvhCnJpx7Gg7cAQSroNmyvK1pamd4namILwxVJtxkiWy1STxCOmRdn1/K8l2ZV4V9V2A+dL2fseIPLYebRY0FMfyenj1YVyFyIqBGKjobqiSje/CFY4KOGYHQe73L2UqQc560okfu9XxXG61Rg4nihRelBicRzmy9JvFNSwNzr5NWTFMtLK1HEL/rn0mbvZJnY2lMFqXa8xTYW7lvTVHkRfc+/naReOJ4ZxJdQ/eqcGC54czoygppU8gllzveh1e2eGfzCQMeowvyjsFVadof6pEW7bI7qm7KtXCL+aI2tgOYmpkdH61zG8V9utQmFU8fE6plh4UOweY/VawAgFfWGMEOgIEFw3kuOxBrtcVIcOOknHpHf18jPGvEmRGADGazie0OSFJkY9vat8TFPcTS6zj/gE=
