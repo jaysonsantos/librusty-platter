@@ -25,7 +25,7 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
         unimplemented!()
     }
     fn exists(&self, path: &str) -> bool {
-        unimplemented!();
+        self.base_path.join(path).exists()
     }
 }
 
@@ -45,5 +45,14 @@ mod tests {
         let fs = LocalFileSystem::new(path.to_str().unwrap());
         fs.mkdir("test");
         assert!(path.join("test").exists());
+    }
+
+    #[test]
+    fn test_exists() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+        assert!(fs.exists("."));
+        assert!(!fs.exists("abc"));
     }
 }
