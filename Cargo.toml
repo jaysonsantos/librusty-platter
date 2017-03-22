@@ -1,0 +1,8 @@
+[package]
+name = "librusty-platter"
+version = "0.1.0"
+authors = ["Jayson Reis (jaysonsantos) <santosdosreis@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
