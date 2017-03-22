@@ -2,13 +2,13 @@ pub mod fs;
 pub mod result;
 
 /// # RustyPlatter
-pub struct RustyPlatter {
-    // fs: Filesystem
+pub struct RustyPlatter<'a> {
+    fs: &'a fs::Filesystem,
 }
 
-impl RustyPlatter {
-    fn new() -> Self {
-        let rusty_platter = RustyPlatter {};
+impl<'a> RustyPlatter<'a> {
+    fn new(fs: &'a fs::Filesystem) -> Self {
+        let rusty_platter = RustyPlatter { fs: fs };
         rusty_platter
     }
 }
@@ -16,8 +16,11 @@ impl RustyPlatter {
 #[cfg(test)]
 mod tests {
     use ::RustyPlatter;
+    use ::fs::local::LocalFileSystem;
+
     #[test]
     fn test_nothing() {
-        let a = RustyPlatter::new();
+        let fs = LocalFileSystem::new(".");
+        let a = RustyPlatter::new(&fs);
     }
 }
