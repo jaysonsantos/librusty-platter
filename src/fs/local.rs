@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::fs::{create_dir, remove_dir_all, remove_file};
+use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 
 use fs::Filesystem;
 use result::RustyPlatterResult;
@@ -20,7 +20,7 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
         Ok(create_dir(self.base_path.join(path))?)
     }
     fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()> {
-        unimplemented!()
+        Ok(rename(self.base_path.join(from), self.base_path.join(to))?)
     }
     fn rm(&self, path: &str) -> RustyPlatterResult<()> {
         let path = self.base_path.join(path);
@@ -51,7 +51,7 @@ mod tests {
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
-        fs.mkdir("test");
+        fs.mkdir("test")?;
         assert!(path.join("test").exists());
     }
 
@@ -74,5 +74,20 @@ mod tests {
         fs.rm("dir").unwrap();
         std_fs::File::create(path.join("file")).unwrap();
         fs.rm("file").unwrap();
+    }
+
+    #[test]
+    fn test_mv() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        std_fs::create_dir(path.join("dir")).unwrap();
+        fs.mv("dir", "dir2").unwrap();
+        assert!(path.join("dir2").exists());
+
+        std_fs::File::create(path.join("file")).unwrap();
+        fs.mv("file", "file2").unwrap();
+        assert!(path.join("file2").exists());
     }
 }
