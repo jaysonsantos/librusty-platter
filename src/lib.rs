@@ -1,4 +1,8 @@
+/// # RustyPlatter
 pub struct RustyPlatter;
+
+pub mod fs;
+pub mod result;
 
 impl RustyPlatter {
     fn new() -> Self {
@@ -9,6 +13,7 @@ impl RustyPlatter {
 
 #[cfg(test)]
 mod tests {
+    use ::RustyPlatter;
     #[test]
     fn test_nothing() {
         let a = RustyPlatter::new();
