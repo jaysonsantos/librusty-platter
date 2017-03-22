@@ -4,6 +4,7 @@ use std::fs::{create_dir, remove_dir_all, remove_file};
 use fs::Filesystem;
 use result::RustyPlatterResult;
 
+/// Implementation of a local filesystem
 pub struct LocalFileSystem<'a> {
     base_path: &'a Path,
 }
