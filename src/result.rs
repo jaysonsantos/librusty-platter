@@ -2,6 +2,7 @@ use std::io;
 
 pub type RustyPlatterResult<T> = Result<T, Error>;
 
+#[derive(Debug)]
 pub enum Error {
     IoError(io::Error),
 }

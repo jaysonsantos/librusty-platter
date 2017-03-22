@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::fs::create_dir;
+use std::fs::{create_dir, remove_dir_all, remove_file};
 
 use fs::Filesystem;
 use result::RustyPlatterResult;
@@ -22,7 +22,12 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
         unimplemented!()
     }
     fn rm(&self, path: &str) -> RustyPlatterResult<()> {
-        unimplemented!()
+        let path = self.base_path.join(path);
+        if path.is_dir() {
+            Ok(remove_dir_all(path)?)
+        } else {
+            Ok(remove_file(path)?)
+        }
     }
     fn exists(&self, path: &str) -> bool {
         self.base_path.join(path).exists()
@@ -32,6 +37,8 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
+
+    use std::fs as std_fs;
 
     use self::tempdir::TempDir;
 
@@ -54,5 +61,17 @@ mod tests {
         let fs = LocalFileSystem::new(path.to_str().unwrap());
         assert!(fs.exists("."));
         assert!(!fs.exists("abc"));
+    }
+
+    #[test]
+    fn test_rm() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        std_fs::create_dir(path.join("dir")).unwrap();
+        fs.rm("dir").unwrap();
+        std_fs::File::create(path.join("file")).unwrap();
+        fs.rm("file").unwrap();
     }
 }
