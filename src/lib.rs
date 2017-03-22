@@ -1,8 +1,10 @@
-/// # RustyPlatter
-pub struct RustyPlatter;
-
 pub mod fs;
 pub mod result;
+
+/// # RustyPlatter
+pub struct RustyPlatter {
+    // fs: Filesystem
+}
 
 impl RustyPlatter {
     fn new() -> Self {

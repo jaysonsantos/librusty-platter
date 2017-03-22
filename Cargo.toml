@@ -1,8 +1,9 @@
 [package]
-name = "librusty-platter"
-version = "0.1.0"
 authors = ["Jayson Reis (jaysonsantos) <santosdosreis@gmail.com>"]
 license = "MIT"
+name = "librusty-platter"
 readme = "README.md"
+version = "0.1.0"
 
 [dependencies]
+ring = "0.7.3"
