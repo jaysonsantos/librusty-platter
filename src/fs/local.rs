@@ -51,7 +51,7 @@ mod tests {
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
-        fs.mkdir("test")?;
+        fs.mkdir("test").unwrap();
         assert!(path.join("test").exists());
     }
 
