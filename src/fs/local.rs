@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 
-use fs::Filesystem;
+use fs;
 use result::RustyPlatterResult;
 
 /// Implementation of a local filesystem
@@ -15,7 +15,7 @@ impl<'a> LocalFileSystem<'a> {
     }
 }
 
-impl<'a> Filesystem for LocalFileSystem<'a> {
+impl<'a> fs::Filesystem for LocalFileSystem<'a> {
     fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
         Ok(create_dir(self.base_path.join(path))?)
     }
@@ -33,6 +33,17 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
     fn exists(&self, path: &str) -> bool {
         self.base_path.join(path).exists()
     }
+    fn open(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
+        Ok(Box::new(LocalFile {}))
+    }
+}
+
+pub struct LocalFile {}
+
+impl fs::File for LocalFile {
+    fn write(&self, content: &[u8]) -> RustyPlatterResult<usize> {
+        Ok(1)
+    }
 }
 
 #[cfg(test)]
@@ -43,8 +54,8 @@ mod tests {
 
     use self::tempdir::TempDir;
 
-    use ::fs::Filesystem;
-    use ::fs::local::LocalFileSystem;
+    use super::*;
+    use super::fs::*;
 
     #[test]
     fn test_mkdir() {
@@ -89,5 +100,15 @@ mod tests {
         std_fs::File::create(path.join("file")).unwrap();
         fs.mv("file", "file2").unwrap();
         assert!(path.join("file2").exists());
+    }
+
+    #[test]
+    fn test_write() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+        let file = fs.open("ab.txt").unwrap();
+        assert_eq!(file.write(b"a").unwrap(), 1 as usize);
+
     }
 }
