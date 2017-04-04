@@ -1,4 +1,6 @@
-use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305};
+use base64::encode;
+
+use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305, seal_in_place};
 use ring::pbkdf2;
 use ring::rand::SystemRandom;
 
@@ -52,7 +54,7 @@ impl Config {
     }
 
     fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        // let config_file = fs.open(".rusty-platter.json");
+        let config_file = fs.open(".rusty-platter.json")?;
         Ok(())
     }
 }
@@ -71,6 +73,29 @@ impl<'a> EncryptedFs<'a> {
         }
     }
 
+    fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+        assert!(name.len() >= 16);  // TODO: Add some padding
+        let keys = self.config.keys.as_ref().unwrap();
+        let additional_data = [];
+        let mut nonce = vec![0; 12];
+        let mut output: Vec<u8> = vec![];
+        let mut to_encrypt: Vec<u8> = vec![];
+        to_encrypt.extend_from_slice(name.as_bytes());
+
+        // Fill nonce with random data
+        let rand = SystemRandom::new();
+        rand.fill(&mut nonce);
+        output.extend_from_slice(&nonce);
+
+        seal_in_place(&keys.sealing,
+                      &nonce,
+                      &additional_data,
+                      &mut to_encrypt,
+                      CHACHA20_POLY1305.tag_len())?;
+        output.extend_from_slice(&to_encrypt);
+        Ok(encode(&output))
+    }
+
     fn mkdir() {
         unimplemented!()
     }
@@ -80,24 +105,44 @@ impl<'a> EncryptedFs<'a> {
 #[cfg(test)]
 mod tests {
     extern crate ring;
+    extern crate tempdir;
 
     use ring::aead::*;
     use ring::pbkdf2::*;
     use ring::rand::SystemRandom;
 
+    use self::tempdir::TempDir;
+
     use super::*;
+    use fs::local::LocalFileSystem;
 
     const PASSWORD: &'static str = "password";
     const ITERATIONS: u32 = 100;
 
     #[test]
-    fn test_mkdir() {
-//        let fs = Filesystem::new();
-//        let config = Config::new(PASSWORD, ITERATIONS, fs).unwrap();
-//        let encrypted = EncryptedFs::new(fs, config);
+    fn test_encrypt_name() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let encrypted = EncryptedFs::new(&fs, config);
+        let encrypted_name = encrypted.encrypt_name("abc").unwrap();
+        assert_eq!(encrypted_name, "abc");
     }
 
     #[test]
+    fn test_mkdir() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let encrypted = EncryptedFs::new(&fs, config);
+
+        // encrypted.mkdir("abc");
+    }
+
     fn test_encryption() {
         // The password will be used to generate a key
         let password = b"nice password";
