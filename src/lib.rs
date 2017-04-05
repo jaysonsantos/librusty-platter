@@ -7,6 +7,7 @@ extern crate serde_json;
 
 pub mod fs;
 pub mod result;
+pub mod config;
 
 // /// # RustyPlatter
 // pub struct RustyPlatter<'a> {

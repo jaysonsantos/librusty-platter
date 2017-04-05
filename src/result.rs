@@ -1,6 +1,8 @@
-use std::io;
+use base64;
 
 use ring;
+
+use std::io;
 
 pub type RustyPlatterResult<T> = Result<T, Error>;
 
@@ -8,6 +10,8 @@ pub type RustyPlatterResult<T> = Result<T, Error>;
 pub enum Error {
     IoError(io::Error),
     CryptoError,
+    Base64Error,
+    InvalidEncodedName,
 }
 
 impl From<io::Error> for Error {
@@ -19,5 +23,12 @@ impl From<io::Error> for Error {
 impl From<ring::error::Unspecified> for Error {
     fn from(_: ring::error::Unspecified) -> Self {
         Error::CryptoError
+    }
+}
+
+impl From<base64::Base64Error> for Error {
+    // TODO: Better error handling for base64
+    fn from(_: base64::Base64Error) -> Self {
+        Error::Base64Error
     }
 }

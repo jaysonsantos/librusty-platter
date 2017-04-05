@@ -4,7 +4,7 @@ pub mod encrypted;
 use result::RustyPlatterResult;
 
 pub trait File {
-     fn write(&self, content: &[u8]) -> RustyPlatterResult<usize>;
+    fn write(&self, content: &[u8]) -> RustyPlatterResult<usize>;
 }
 
 /// Basic filesystem trait

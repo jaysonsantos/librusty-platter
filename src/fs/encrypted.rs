@@ -1,66 +1,16 @@
-use base64::encode;
+use base64::{encode, decode};
 
+use config::Config;
 use fs::Filesystem;
-use result::RustyPlatterResult;
+use result::{RustyPlatterResult, Error};
 
-use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305, seal_in_place};
+use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305, seal_in_place, open_in_place};
 use ring::pbkdf2;
 use ring::rand::{SystemRandom, SecureRandom};
 
 use serde_json;
 
 const MINIMUM_ENCRYPTION_SIZE: usize = 16;
-
-struct Keys {
-    opening: OpeningKey,
-    sealing: SealingKey,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Config {
-    salt: [u8; 16],
-
-    iterations: u32,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    keys: Option<Keys>,
-}
-
-impl Config {
-    #![allow(dead_code)]
-    fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
-        let mut salt = [0u8; 16];
-        let rand = SystemRandom::new();
-        rand.fill(&mut salt)?;
-
-        let mut key = [0; 32];
-        pbkdf2::derive(&pbkdf2::HMAC_SHA256,
-                       iterations,
-                       &salt,
-                       password.as_bytes(),
-                       &mut key);
-
-        let keys = Keys {
-            opening: OpeningKey::new(&CHACHA20_POLY1305, &key[..])?,
-            sealing: SealingKey::new(&CHACHA20_POLY1305, &key[..])?,
-        };
-
-        let config = Config {
-            salt: salt,
-            iterations: iterations,
-            keys: Some(keys),
-        };
-
-        config.save(fs)?;
-
-        Ok(config)
-    }
-
-    fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        let config_file = fs.open(".rusty-platter.json")?;
-        Ok(())
-    }
-}
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 struct EncryptedFs<'a> {
@@ -89,10 +39,9 @@ impl<'a> EncryptedFs<'a> {
     fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
         let keys = self.config.keys.as_ref().unwrap();
         let additional_data = [];
-        let mut nonce = vec![0; 12];
+        let mut nonce = vec![0; keys.sealing.algorithm().nonce_len()];
         let mut output: Vec<u8> = vec![];
-        let mut to_encrypt: Vec<u8> = vec![];
-        to_encrypt.extend_from_slice(name.as_bytes());
+        let mut to_encrypt = name.as_bytes().to_vec();
         if let Some(remaining) = MINIMUM_ENCRYPTION_SIZE.checked_sub(to_encrypt.len()) {
             for _ in 0..remaining {
                 to_encrypt.push(0);
@@ -101,16 +50,29 @@ impl<'a> EncryptedFs<'a> {
 
         // Fill nonce with random data
         self.random.fill(&mut nonce)?;
-        println!("{:?}", nonce);
         output.extend_from_slice(&nonce);
 
-        seal_in_place(&keys.sealing,
-                      &nonce,
-                      &additional_data,
-                      &mut to_encrypt,
-                      CHACHA20_POLY1305.tag_len())?;
+        let out = seal_in_place(&keys.sealing,
+                                &nonce,
+                                &additional_data,
+                                &mut to_encrypt,
+                                CHACHA20_POLY1305.tag_len())?;
         output.extend_from_slice(&to_encrypt);
         Ok(encode(&output))
+    }
+
+    fn decrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+        let keys = self.config.keys.as_ref().unwrap();
+        let mut nonce = decode(name)?;
+        let mut encrypted_data = nonce.split_off(keys.opening.algorithm().nonce_len());
+        println!("{:?} {:?} {}", nonce, encrypted_data, encrypted_data.len());
+        let additional_data = [];
+        open_in_place(&keys.opening,
+                      &nonce,
+                      &additional_data,
+                      0,
+                      &mut encrypted_data).map_err(|_| Error::InvalidEncodedName)?;
+        String::from_utf8(encrypted_data).map_err(|_| Error::InvalidEncodedName)
     }
 
     fn mkdir() {
@@ -160,7 +122,22 @@ mod tests {
 
         let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
-        let encrypted_name = encrypted.encrypt_name("abcd").unwrap();
+        let encrypted_name = encrypted.encrypt_name("1234567890123456").unwrap();
+
+        assert_eq!(encrypted_name, "abc");
+    }
+
+    #[test]
+    fn test_decrypt_name() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        let encrypted_name = encrypted.decrypt_name("AAECAwQFBgcICQoLPMcm4S+zB9x3QDyUx89jWA==")
+            .unwrap();
+
         assert_eq!(encrypted_name, "abc");
     }
 
@@ -176,6 +153,7 @@ mod tests {
         // encrypted.mkdir("abc");
     }
 
+    #[test]
     fn test_encryption() {
         // The password will be used to generate a key
         let password = b"nice password";
