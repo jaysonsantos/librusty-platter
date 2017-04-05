@@ -13,7 +13,7 @@ use serde_json;
 const MINIMUM_ENCRYPTION_SIZE: usize = 16;
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
-struct EncryptedFs<'a> {
+pub struct EncryptedFs<'a> {
     fs: &'a Filesystem,
     config: Config,
     random: Box<SecureRandom>,
@@ -58,6 +58,7 @@ impl<'a> EncryptedFs<'a> {
                                 &mut to_encrypt,
                                 CHACHA20_POLY1305.tag_len())?;
         output.extend_from_slice(&to_encrypt);
+        println!("{}", encode(&output));
         Ok(encode(&output))
     }
 
@@ -122,9 +123,13 @@ mod tests {
 
         let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
-        let encrypted_name = encrypted.encrypt_name("1234567890123456").unwrap();
+        // let a = "a nice string to encrypt for test";
+        let a = "a";
+        let encrypted_name = encrypted.encrypt_name(a).unwrap();
+        let encrypted_name2 = encrypted.encrypt_name(a).unwrap();
+        assert_eq!(encrypted_name, encrypted_name2);
+        assert_eq!(encrypted.decrypt_name(&*encrypted_name).unwrap(), a);
 
-        assert_eq!(encrypted_name, "abc");
     }
 
     #[test]

@@ -24,7 +24,7 @@ pub struct Config {
 
 impl Config {
     #![allow(dead_code)]
-    fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
+    pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
         let mut salt = [0u8; 16];
         let rand = SystemRandom::new();
         rand.fill(&mut salt)?;
