@@ -1,8 +1,8 @@
-use std::path::Path;
-use std::fs::{create_dir, remove_dir_all, remove_file, rename};
-
 use fs;
 use result::RustyPlatterResult;
+
+use std::fs::{create_dir, remove_dir_all, remove_file, rename};
+use std::path::Path;
 
 /// Implementation of a local filesystem
 pub struct LocalFileSystem<'a> {
@@ -50,9 +50,9 @@ impl fs::File for LocalFile {
 mod tests {
     extern crate tempdir;
 
-    use std::fs as std_fs;
 
     use self::tempdir::TempDir;
+    use std::fs as std_fs;
 
     use super::*;
     use super::fs::*;

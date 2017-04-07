@@ -12,6 +12,7 @@ pub enum Error {
     CryptoError,
     Base64Error,
     InvalidEncodedName,
+    InvalidPathName,
 }
 
 impl From<io::Error> for Error {
