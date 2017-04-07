@@ -7,6 +7,8 @@ use ring::rand::{SystemRandom, SecureRandom};
 
 use serde_json;
 
+const MINIMUM_ITERATIONS: u32 = 10_000;
+
 pub struct Keys {
     pub opening: OpeningKey,
     pub sealing: SealingKey,
@@ -25,6 +27,9 @@ pub struct Config {
 impl Config {
     #![allow(dead_code)]
     pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
+        if iterations < MINIMUM_ITERATIONS {
+            return Err(Error::IterationsNumberTooSmall);
+        }
         let mut salt = [0u8; 16];
         let rand = SystemRandom::new();
         rand.fill(&mut salt)?;

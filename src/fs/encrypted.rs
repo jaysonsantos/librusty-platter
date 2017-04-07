@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     const PASSWORD: &'static str = "password";
-    const ITERATIONS: u32 = 100;
+    const ITERATIONS: u32 = 10_000;
 
     struct DumbRandom {}
 

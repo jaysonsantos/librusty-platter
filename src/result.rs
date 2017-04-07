@@ -13,6 +13,7 @@ pub enum Error {
     Base64Error,
     InvalidEncodedName,
     InvalidPathName,
+    IterationsNumberTooSmall,
 }
 
 impl From<io::Error> for Error {
