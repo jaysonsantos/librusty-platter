@@ -4,11 +4,9 @@ use config::Config;
 use fs::Filesystem;
 use result::{RustyPlatterResult, Error};
 
-use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305, seal_in_place, open_in_place};
+use ring::aead::{CHACHA20_POLY1305, seal_in_place, open_in_place};
 use ring::pbkdf2;
 use ring::rand::{SystemRandom, SecureRandom};
-
-use serde_json;
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
@@ -34,12 +32,18 @@ impl<'a> EncryptedFs<'a> {
         }
     }
 
-    fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
-        let keys = self.config.keys.as_ref().unwrap();
+    /// Encrypt a name and return it as base64 string
+    pub fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+        Ok(encode(&self.encrypt_data(name.as_bytes())?))
+    }
+
+    /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes) and encrypted data (input_data.len())
+    pub fn encrypt_data(&self, input_data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let additional_data = [];
+        let keys = self.config.keys.as_ref().unwrap();
         let mut nonce = vec![0; keys.sealing.algorithm().nonce_len()];
         let mut output: Vec<u8> = vec![];
-        let mut to_encrypt = name.as_bytes().to_vec();
+        let mut to_encrypt = input_data.to_vec();
 
         if to_encrypt.len() == 0 {
             return Err(Error::InvalidPathName);
@@ -54,20 +58,27 @@ impl<'a> EncryptedFs<'a> {
         self.random.fill(&mut nonce)?;
         output.extend_from_slice(&nonce);
 
-        let out = seal_in_place(&keys.sealing,
-                                &nonce,
-                                &additional_data,
-                                &mut to_encrypt,
-                                CHACHA20_POLY1305.tag_len())?;
+        seal_in_place(&keys.sealing,
+                      &nonce,
+                      &additional_data,
+                      &mut to_encrypt,
+                      CHACHA20_POLY1305.tag_len())?;
 
         output.extend_from_slice(&to_encrypt);
-        assert_eq!(to_encrypt.len(), out);
-        Ok(encode(&output))
+        Ok(output)
     }
 
-    fn decrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+    /// Decrypt a base64 encoded string returning a string
+    pub fn decrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+        let data = decode(name)?;
+        let decrypted = self.decrypt_data(&*data)?;
+        String::from_utf8(decrypted.to_vec()).map_err(|_| Error::InvalidEncodedName)
+    }
+
+    /// Decrypt already chunked slices return the binary data
+    pub fn decrypt_data(&self, data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let keys = self.config.keys.as_ref().unwrap();
-        let mut nonce = decode(name)?;
+        let mut nonce = data.to_vec();
         let mut encrypted_data = nonce.split_off(keys.opening.algorithm().nonce_len());
         let additional_data = [];
         let decrypted = open_in_place(&keys.opening,
@@ -75,11 +86,23 @@ impl<'a> EncryptedFs<'a> {
                                       &additional_data,
                                       0,
                                       &mut encrypted_data).map_err(|_| Error::InvalidEncodedName)?;
-        String::from_utf8(decrypted.to_vec()).map_err(|_| Error::InvalidEncodedName)
+        Ok(decrypted.to_vec())
     }
 
-    fn mkdir() {
-        unimplemented!()
+    /// Create an encrypted directory
+    pub fn mkdir(&self, name: &str) -> RustyPlatterResult<()> {
+        let path_sep = "/";
+        let path: Vec<&str> = name.split(path_sep)
+            // Remove stuff like a//b
+            .filter(|name| name.len() > 0)
+            .collect();
+        let mut encrypted_path = vec![];
+        for part in &path {
+            encrypted_path.push(self.encrypt_name(part)?);
+        }
+        let encrypted_path = encrypted_path.join(path_sep);
+        print!("{:?}", encrypted_path);
+        self.fs.mkdir(&*encrypted_path)
     }
 }
 
@@ -91,9 +114,7 @@ mod tests {
 
     use fs::local::LocalFileSystem;
 
-    use ring::aead::*;
     use ring::error::Unspecified;
-    use ring::pbkdf2::*;
     use ring::rand::SystemRandom;
 
     use self::tempdir::TempDir;
@@ -130,5 +151,16 @@ mod tests {
         let data = "path name";
         let encrypted_name = encrypted.encrypt_name(data).unwrap();
         assert_eq!(encrypted.decrypt_name(&*encrypted_name).unwrap(), data);
+    }
+
+    #[test]
+    fn test_mkdir() {
+        let temp = TempDir::new("test_en_decrypt_name").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+
+        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        encrypted.mkdir("abc").unwrap();
     }
 }

@@ -1,11 +1,9 @@
 use fs::Filesystem;
 use result::{RustyPlatterResult, Error};
 
-use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305, seal_in_place, open_in_place};
+use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305};
 use ring::pbkdf2;
-use ring::rand::{SystemRandom, SecureRandom};
-
-use serde_json;
+use ring::rand::SystemRandom;
 
 const MINIMUM_ITERATIONS: u32 = 10_000;
 
@@ -58,7 +56,7 @@ impl Config {
     }
 
     fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        let config_file = fs.open(".rusty-platter.json")?;
+        // let config_file = fs.open(".rusty-platter.json")?;
         Ok(())
     }
 }
