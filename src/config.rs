@@ -18,6 +18,7 @@ pub struct Config {
 
     iterations: u32,
 
+    /// Keys are stored as option to make it optional when serializing but they will always be there, so it is safe (?) to call unwrap
     #[serde(skip_serializing, skip_deserializing)]
     pub keys: Option<Keys>,
 }
@@ -56,7 +57,8 @@ impl Config {
     }
 
     fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        // let config_file = fs.open(".rusty-platter.json")?;
+        // let path = format!("{}{}", fs.path_separator(), ".rusty-platter.json");
+        // let config_file = fs.open(&path)?;
         Ok(())
     }
 }

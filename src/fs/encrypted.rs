@@ -5,7 +5,6 @@ use fs::Filesystem;
 use result::{RustyPlatterResult, Error};
 
 use ring::aead::{CHACHA20_POLY1305, seal_in_place, open_in_place};
-use ring::pbkdf2;
 use ring::rand::{SystemRandom, SecureRandom};
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
@@ -24,7 +23,9 @@ impl<'a> EncryptedFs<'a> {
         }
     }
 
+    #[allow(dead_code)]
     fn with_custom_random(fs: &'a Filesystem, config: Config, random: Box<SecureRandom>) -> Self {
+        // Constructor mainly used for tests where we can mock random values
         EncryptedFs {
             fs: fs,
             config: config,
@@ -45,7 +46,7 @@ impl<'a> EncryptedFs<'a> {
         let mut output: Vec<u8> = vec![];
         let mut to_encrypt = input_data.to_vec();
 
-        if to_encrypt.len() == 0 {
+        if to_encrypt.is_empty() {
             return Err(Error::InvalidPathName);
         }
 
@@ -75,7 +76,7 @@ impl<'a> EncryptedFs<'a> {
         String::from_utf8(decrypted.to_vec()).map_err(|_| Error::InvalidEncodedName)
     }
 
-    /// Decrypt already chunked slices return the binary data
+    /// Decrypt already chunked slices and return the binary data
     pub fn decrypt_data(&self, data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let keys = self.config.keys.as_ref().unwrap();
         let mut nonce = data.to_vec();
@@ -94,7 +95,7 @@ impl<'a> EncryptedFs<'a> {
         let path_sep = "/";
         let path: Vec<&str> = name.split(path_sep)
             // Remove stuff like a//b
-            .filter(|name| name.len() > 0)
+            .filter(|name| !name.is_empty())
             .collect();
         let mut encrypted_path = vec![];
         for part in &path {
@@ -106,7 +107,6 @@ impl<'a> EncryptedFs<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate ring;
@@ -115,7 +115,6 @@ mod tests {
     use fs::local::LocalFileSystem;
 
     use ring::error::Unspecified;
-    use ring::rand::SystemRandom;
 
     use self::tempdir::TempDir;
     use std::io::Write;
