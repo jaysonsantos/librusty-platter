@@ -3,7 +3,9 @@ use result::{RustyPlatterResult, Error};
 
 use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305};
 use ring::pbkdf2;
-use ring::rand::SystemRandom;
+use ring::rand::{SecureRandom, SystemRandom};
+
+use serde_json;
 
 const MINIMUM_ITERATIONS: u32 = 10_000;
 
@@ -26,11 +28,19 @@ pub struct Config {
 impl Config {
     #![allow(dead_code)]
     pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
+        let rand = Box::new(SystemRandom::new());
+        Self::new_with_custom_random(password, iterations, fs, rand)
+    }
+
+    pub fn new_with_custom_random(password: &str,
+                                  iterations: u32,
+                                  fs: &Filesystem,
+                                  rand: Box<SecureRandom>)
+                                  -> RustyPlatterResult<Self> {
         if iterations < MINIMUM_ITERATIONS {
             return Err(Error::IterationsNumberTooSmall);
         }
         let mut salt = [0u8; 16];
-        let rand = SystemRandom::new();
         rand.fill(&mut salt)?;
 
         let mut key = [0; 32];
@@ -41,8 +51,8 @@ impl Config {
                        &mut key);
 
         let keys = Keys {
-            opening: OpeningKey::new(&CHACHA20_POLY1305, &key[..])?,
-            sealing: SealingKey::new(&CHACHA20_POLY1305, &key[..])?,
+            opening: OpeningKey::new(&CHACHA20_POLY1305, &key)?,
+            sealing: SealingKey::new(&CHACHA20_POLY1305, &key)?,
         };
 
         let config = Config {
@@ -57,8 +67,9 @@ impl Config {
     }
 
     fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        // let path = format!("{}{}", fs.path_separator(), ".rusty-platter.json");
-        // let config_file = fs.open(&path)?;
+        let path = ".rusty-platter.json";
+        let mut config_file = fs.open(&path)?;
+        // serde_json::to_writer(&mut config_file, &self).unwrap();
         Ok(())
     }
 }

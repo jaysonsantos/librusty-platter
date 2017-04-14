@@ -9,6 +9,7 @@ pub trait File {
 
 /// Basic filesystem trait
 pub trait Filesystem {
+    fn path_separator(&self) -> String;
     fn mkdir(&self, path: &str) -> RustyPlatterResult<()>;
     fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()>;
     fn rm(&self, path: &str) -> RustyPlatterResult<()>;

@@ -38,7 +38,8 @@ impl<'a> EncryptedFs<'a> {
         Ok(encode(&self.encrypt_data(name.as_bytes())?))
     }
 
-    /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes) and encrypted data (input_data.len())
+    /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
+    /// and encrypted data (input_data.len())
     pub fn encrypt_data(&self, input_data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let additional_data = [];
         let keys = self.config.keys.as_ref().unwrap();
@@ -86,14 +87,15 @@ impl<'a> EncryptedFs<'a> {
                                       &nonce,
                                       &additional_data,
                                       0,
-                                      &mut encrypted_data).map_err(|_| Error::InvalidEncodedName)?;
+                                      &mut encrypted_data)
+                .map_err(|_| Error::InvalidEncodedName)?;
         Ok(decrypted.to_vec())
     }
 
     /// Create an encrypted directory
     pub fn mkdir(&self, name: &str) -> RustyPlatterResult<()> {
-        let path_sep = "/";
-        let path: Vec<&str> = name.split(path_sep)
+        let path_sep = self.fs.path_separator();
+        let path: Vec<&str> = name.split(&*path_sep)
             // Remove stuff like a//b
             .filter(|name| !name.is_empty())
             .collect();
@@ -101,7 +103,7 @@ impl<'a> EncryptedFs<'a> {
         for part in &path {
             encrypted_path.push(self.encrypt_name(part)?);
         }
-        let encrypted_path = encrypted_path.join(path_sep);
+        let encrypted_path = encrypted_path.join(&*path_sep);
         print!("{:?}", encrypted_path);
         self.fs.mkdir(&*encrypted_path)
     }
@@ -112,14 +114,13 @@ mod tests {
     extern crate ring;
     extern crate tempdir;
 
+    use self::tempdir::TempDir;
+
+    use super::*;
     use fs::local::LocalFileSystem;
 
     use ring::error::Unspecified;
-
-    use self::tempdir::TempDir;
     use std::io::Write;
-
-    use super::*;
 
     const PASSWORD: &'static str = "password";
     const ITERATIONS: u32 = 10_000;
@@ -145,7 +146,9 @@ mod tests {
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
 
-        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let config =
+            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
+                .unwrap();
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
         let data = "path name";
         let encrypted_name = encrypted.encrypt_name(data).unwrap();
@@ -158,7 +161,9 @@ mod tests {
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
 
-        let config = Config::new(PASSWORD, ITERATIONS, &fs).unwrap();
+        let config =
+            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
+                .unwrap();
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
         encrypted.mkdir("abc").unwrap();
     }

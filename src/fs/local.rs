@@ -2,7 +2,7 @@ use fs;
 use result::RustyPlatterResult;
 
 use std::fs::{create_dir, remove_dir_all, remove_file, rename};
-use std::path::Path;
+use std::path::{Path, MAIN_SEPARATOR};
 
 /// Implementation of a local filesystem
 pub struct LocalFileSystem<'a> {
@@ -16,6 +16,11 @@ impl<'a> LocalFileSystem<'a> {
 }
 
 impl<'a> fs::Filesystem for LocalFileSystem<'a> {
+    fn path_separator(&self) -> String {
+        let mut sep = String::new();
+        sep.push(MAIN_SEPARATOR);
+        sep
+    }
     fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
         Ok(create_dir(self.base_path.join(path))?)
     }
@@ -50,12 +55,11 @@ impl fs::File for LocalFile {
 mod tests {
     extern crate tempdir;
 
-
     use self::tempdir::TempDir;
-    use std::fs as std_fs;
 
     use super::*;
     use super::fs::*;
+    use std::fs as std_fs;
 
     #[test]
     fn test_mkdir() {
