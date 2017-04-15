@@ -20,7 +20,8 @@ pub struct Config {
 
     iterations: u32,
 
-    /// Keys are stored as option to make it optional when serializing but they will always be there, so it is safe (?) to call unwrap
+    /// Keys are stored as option to make it optional when serializing but they will always be
+    /// there, so it is safe (?) to call unwrap
     #[serde(skip_serializing, skip_deserializing)]
     pub keys: Option<Keys>,
 }
@@ -32,6 +33,8 @@ impl Config {
         Self::new_with_custom_random(password, iterations, fs, rand)
     }
 
+    /// Create a new config with a custom random, mainly used with tests but could also be
+    /// used to get some data from random.org for example
     pub fn new_with_custom_random(password: &str,
                                   iterations: u32,
                                   fs: &Filesystem,
@@ -66,7 +69,8 @@ impl Config {
         Ok(config)
     }
 
-    fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
+    /// Save current config to FS_ROOT/.rusty-platter.json
+    pub fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
         let path = ".rusty-platter.json";
         let mut config_file = fs.open(&path)?;
         serde_json::to_writer(&mut config_file, &self).unwrap();
