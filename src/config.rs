@@ -69,7 +69,7 @@ impl Config {
     fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
         let path = ".rusty-platter.json";
         let mut config_file = fs.open(&path)?;
-        // serde_json::to_writer(&mut config_file, &self).unwrap();
+        serde_json::to_writer(&mut config_file, &self).unwrap();
         Ok(())
     }
 }
