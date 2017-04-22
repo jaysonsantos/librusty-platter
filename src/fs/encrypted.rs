@@ -15,6 +15,7 @@ pub struct EncryptedFs<'a> {
 }
 
 impl<'a> EncryptedFs<'a> {
+    #![allow(dead_code)]
     fn new(fs: &'a Filesystem, config: Config) -> Self {
         EncryptedFs {
             fs: fs,
@@ -52,7 +53,9 @@ impl<'a> EncryptedFs<'a> {
         }
 
         // Initialize space for the tag
-        for _ in 0..keys.sealing.algorithm().tag_len() {
+        let tag_len = keys.sealing.algorithm().tag_len();
+        to_encrypt.reserve_exact(tag_len);
+        for _ in 0..tag_len {
             to_encrypt.push(0);
         }
 

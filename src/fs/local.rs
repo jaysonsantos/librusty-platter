@@ -3,8 +3,8 @@ use result::RustyPlatterResult;
 
 use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 use std::fs::File as StdFile;
-use std::io::Write;
 use std::io::Result as IoResult;
+use std::io::Write;
 use std::path::{Path, MAIN_SEPARATOR};
 
 /// Implementation of a local filesystem
