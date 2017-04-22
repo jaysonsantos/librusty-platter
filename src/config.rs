@@ -23,7 +23,7 @@ pub struct Config {
     /// Keys are stored as option to make it optional when serializing but they will always be
     /// there, so it is safe (?) to call unwrap
     #[serde(skip_serializing, skip_deserializing)]
-    pub keys: Option<Keys>,
+    keys: Option<Keys>,
 }
 
 impl Config {
@@ -31,6 +31,14 @@ impl Config {
     pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
         let rand = Box::new(SystemRandom::new());
         Self::new_with_custom_random(password, iterations, fs, rand)
+    }
+
+    pub fn sealing_key(&self) -> &SealingKey {
+        &self.keys.as_ref().unwrap().sealing
+    }
+
+    pub fn openning_key(&self) -> &OpeningKey {
+        &self.keys.as_ref().unwrap().opening
     }
 
     /// Create a new config with a custom random, mainly used with tests but could also be

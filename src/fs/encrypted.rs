@@ -43,8 +43,8 @@ impl<'a> EncryptedFs<'a> {
     /// and encrypted data (input_data.len())
     pub fn encrypt_data(&self, input_data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let additional_data = [];
-        let keys = self.config.keys.as_ref().unwrap();
-        let mut nonce = vec![0; keys.sealing.algorithm().nonce_len()];
+        let sealing_key = self.config.sealing_key();
+        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
         let mut output: Vec<u8> = vec![];
         let mut to_encrypt = input_data.to_vec();
 
@@ -53,7 +53,7 @@ impl<'a> EncryptedFs<'a> {
         }
 
         // Initialize space for the tag
-        let tag_len = keys.sealing.algorithm().tag_len();
+        let tag_len = sealing_key.algorithm().tag_len();
         to_encrypt.reserve_exact(tag_len);
         for _ in 0..tag_len {
             to_encrypt.push(0);
@@ -63,7 +63,7 @@ impl<'a> EncryptedFs<'a> {
         self.random.fill(&mut nonce)?;
         output.extend_from_slice(&nonce);
 
-        seal_in_place(&keys.sealing,
+        seal_in_place(&sealing_key,
                       &nonce,
                       &additional_data,
                       &mut to_encrypt,
@@ -82,11 +82,11 @@ impl<'a> EncryptedFs<'a> {
 
     /// Decrypt already chunked slices and return the binary data
     pub fn decrypt_data(&self, data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
-        let keys = self.config.keys.as_ref().unwrap();
+        let opening_key = self.config.openning_key();
         let mut nonce = data.to_vec();
-        let mut encrypted_data = nonce.split_off(keys.opening.algorithm().nonce_len());
+        let mut encrypted_data = nonce.split_off(opening_key.algorithm().nonce_len());
         let additional_data = [];
-        let decrypted = open_in_place(&keys.opening,
+        let decrypted = open_in_place(&opening_key,
                                       &nonce,
                                       &additional_data,
                                       0,
