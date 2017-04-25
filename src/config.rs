@@ -15,18 +15,21 @@ pub struct Keys {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Config {
+pub struct Config<'a> {
     salt: [u8; 16],
 
     iterations: u32,
 
-    /// Keys are stored as option to make it optional when serializing but they will always be
-    /// there, so it is safe (?) to call unwrap
+    /// Keys are stored as option to make it optional when serializing but they will always
+    /// be there, so it is safe (?) to call unwrap
     #[serde(skip_serializing, skip_deserializing)]
     keys: Option<Keys>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    fs: Option<&'a Filesystem>,
 }
 
-impl Config {
+impl<'a> Config<'a> {
     #![allow(dead_code)]
     pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
         let rand = Box::new(SystemRandom::new());
@@ -41,6 +44,11 @@ impl Config {
         &self.keys.as_ref().unwrap().opening
     }
 
+    /// Get underlying Config's base_path
+    pub fn base_path(&self) -> String {
+        self.fs.as_ref().unwrap().base_path
+    }
+
     /// Create a new config with a custom random, mainly used with tests but could also be
     /// used to get some data from random.org for example
     pub fn new_with_custom_random(password: &str,
@@ -51,6 +59,7 @@ impl Config {
         if iterations < MINIMUM_ITERATIONS {
             return Err(Error::IterationsNumberTooSmall);
         }
+
         let mut salt = [0u8; 16];
         rand.fill(&mut salt)?;
 
@@ -70,6 +79,7 @@ impl Config {
             salt: salt,
             iterations: iterations,
             keys: Some(keys),
+            fs: Some(fs),
         };
 
         config.save(fs)?;

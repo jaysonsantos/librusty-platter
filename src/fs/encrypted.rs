@@ -10,7 +10,7 @@ use ring::rand::{SystemRandom, SecureRandom};
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
     fs: &'a Filesystem,
-    config: Config,
+    config: &'a Config,
     random: Box<SecureRandom>,
 }
 
@@ -103,6 +103,7 @@ impl<'a> EncryptedFs<'a> {
             .filter(|name| !name.is_empty())
             .collect();
         let mut encrypted_path = vec![];
+        encrypted_path.push(self.config.root);
         for part in &path {
             encrypted_path.push(self.encrypt_name(part)?);
         }

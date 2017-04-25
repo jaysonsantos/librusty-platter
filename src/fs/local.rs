@@ -9,7 +9,7 @@ use std::path::{Path, MAIN_SEPARATOR};
 
 /// Implementation of a local filesystem
 pub struct LocalFileSystem<'a> {
-    base_path: &'a Path,
+    pub base_path: &'a Path,
 }
 
 impl<'a> LocalFileSystem<'a> {
@@ -24,12 +24,15 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         sep.push(MAIN_SEPARATOR);
         sep
     }
+
     fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
         Ok(create_dir(self.base_path.join(path))?)
     }
+
     fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()> {
         Ok(rename(self.base_path.join(from), self.base_path.join(to))?)
     }
+
     fn rm(&self, path: &str) -> RustyPlatterResult<()> {
         let path = self.base_path.join(path);
         if path.is_dir() {
@@ -38,12 +41,15 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
             Ok(remove_file(path)?)
         }
     }
+
     fn exists(&self, path: &str) -> bool {
         self.base_path.join(path).exists()
     }
+
     fn open(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
         Ok(LocalFile::open_boxed(path)?)
     }
+
     fn create(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
         Ok(LocalFile::create_boxed(path)?)
     }
@@ -57,12 +63,15 @@ impl LocalFile {
     pub fn open(path: &str) -> RustyPlatterResult<Self> {
         Ok(LocalFile { fd: StdFile::open(path)? })
     }
+
     pub fn open_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
         Ok(Box::new(LocalFile::open(path)?))
     }
+
     pub fn create(path: &str) -> RustyPlatterResult<Self> {
         Ok(LocalFile { fd: StdFile::create(path)? })
     }
+
     pub fn create_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
         Ok(Box::new(LocalFile::create(path)?))
     }
@@ -74,6 +83,7 @@ impl Write for LocalFile {
     fn write(&mut self, content: &[u8]) -> IoResult<usize> {
         Ok(self.fd.write(content)?)
     }
+
     fn flush(&mut self) -> IoResult<()> {
         Ok(self.fd.flush()?)
     }
