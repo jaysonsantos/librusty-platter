@@ -6,7 +6,7 @@ readme = "README.md"
 version = "0.1.0"
 
 [dependencies]
-base64 = "0.4.1"
+data-encoding = "2.0.0-rc.1"
 ring = "0.7.3"
 serde = "0.9.12"
 serde_derive = "0.9.12"

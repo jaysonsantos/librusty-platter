@@ -8,6 +8,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde_json;
 
 const MINIMUM_ITERATIONS: u32 = 10_000;
+const CONFIG_PATH: &'static str = ".rusty-platter.json";
 
 pub struct Keys {
     pub opening: OpeningKey,
@@ -15,7 +16,7 @@ pub struct Keys {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Config<'a> {
+pub struct Config {
     salt: [u8; 16],
 
     iterations: u32,
@@ -24,12 +25,9 @@ pub struct Config<'a> {
     /// be there, so it is safe (?) to call unwrap
     #[serde(skip_serializing, skip_deserializing)]
     keys: Option<Keys>,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    fs: Option<&'a Filesystem>,
 }
 
-impl<'a> Config<'a> {
+impl Config {
     #![allow(dead_code)]
     pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
         let rand = Box::new(SystemRandom::new());
@@ -42,11 +40,6 @@ impl<'a> Config<'a> {
 
     pub fn openning_key(&self) -> &OpeningKey {
         &self.keys.as_ref().unwrap().opening
-    }
-
-    /// Get underlying Config's base_path
-    pub fn base_path(&self) -> String {
-        self.fs.as_ref().unwrap().base_path
     }
 
     /// Create a new config with a custom random, mainly used with tests but could also be
@@ -79,7 +72,6 @@ impl<'a> Config<'a> {
             salt: salt,
             iterations: iterations,
             keys: Some(keys),
-            fs: Some(fs),
         };
 
         config.save(fs)?;
@@ -89,8 +81,7 @@ impl<'a> Config<'a> {
 
     /// Save current config to FS_ROOT/.rusty-platter.json
     pub fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
-        let path = ".rusty-platter.json";
-        let mut config_file = fs.open(&path)?;
+        let mut config_file = fs.open(CONFIG_PATH)?;
         serde_json::to_writer(&mut config_file, &self).unwrap();
         Ok(())
     }

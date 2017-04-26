@@ -1,4 +1,4 @@
-use base64;
+use data_encoding;
 
 use ring;
 
@@ -10,7 +10,7 @@ pub type RustyPlatterResult<T> = Result<T, Error>;
 pub enum Error {
     IoError(io::Error),
     CryptoError,
-    Base64Error,
+    Base32Error,
     InvalidEncodedName,
     InvalidPathName,
     IterationsNumberTooSmall,
@@ -28,9 +28,9 @@ impl From<ring::error::Unspecified> for Error {
     }
 }
 
-impl From<base64::Base64Error> for Error {
-    // TODO: Better error handling for base64
-    fn from(_: base64::Base64Error) -> Self {
-        Error::Base64Error
+impl From<data_encoding::DecodeError> for Error {
+    // TODO: Better error handling for base32
+    fn from(_: data_encoding::DecodeError) -> Self {
+        Error::Base32Error
     }
 }

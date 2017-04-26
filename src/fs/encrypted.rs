@@ -1,4 +1,4 @@
-use base64::{encode, decode};
+use data_encoding::BASE32;
 
 use config::Config;
 use fs::Filesystem;
@@ -10,7 +10,7 @@ use ring::rand::{SystemRandom, SecureRandom};
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
     fs: &'a Filesystem,
-    config: &'a Config,
+    config: Config,
     random: Box<SecureRandom>,
 }
 
@@ -36,7 +36,7 @@ impl<'a> EncryptedFs<'a> {
 
     /// Encrypt a name and return it as base64 string
     pub fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
-        Ok(encode(&self.encrypt_data(name.as_bytes())?))
+        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes())?))
     }
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
@@ -75,7 +75,7 @@ impl<'a> EncryptedFs<'a> {
 
     /// Decrypt a base64 encoded string returning a string
     pub fn decrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
-        let data = decode(name)?;
+        let data = BASE32.decode(name.as_bytes())?;
         let decrypted = self.decrypt_data(&*data)?;
         String::from_utf8(decrypted.to_vec()).map_err(|_| Error::InvalidEncodedName)
     }
@@ -103,7 +103,6 @@ impl<'a> EncryptedFs<'a> {
             .filter(|name| !name.is_empty())
             .collect();
         let mut encrypted_path = vec![];
-        encrypted_path.push(self.config.root);
         for part in &path {
             encrypted_path.push(self.encrypt_name(part)?);
         }

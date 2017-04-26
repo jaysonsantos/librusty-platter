@@ -1,4 +1,4 @@
-extern crate base64;
+extern crate data_encoding;
 extern crate ring;
 #[macro_use]
 extern crate serde_derive;
