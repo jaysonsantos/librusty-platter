@@ -1,6 +1,5 @@
-use data_encoding::BASE32;
-
 use config::Config;
+use data_encoding::BASE32;
 use fs::Filesystem;
 use result::{RustyPlatterResult, Error};
 
@@ -54,15 +53,13 @@ impl<'a> EncryptedFs<'a> {
 
         // Initialize space for the tag
         let tag_len = sealing_key.algorithm().tag_len();
-        to_encrypt.reserve_exact(tag_len);
-        for _ in 0..tag_len {
-            to_encrypt.push(0);
-        }
+        to_encrypt.resize(input_data.len() + tag_len, 0);
 
         // Fill nonce with random data
         self.random.fill(&mut nonce)?;
         output.extend_from_slice(&nonce);
 
+        // Don't truncate because we want to keep it as fixed size
         seal_in_place(&sealing_key,
                       &nonce,
                       &additional_data,
@@ -107,7 +104,6 @@ impl<'a> EncryptedFs<'a> {
             encrypted_path.push(self.encrypt_name(part)?);
         }
         let encrypted_path = encrypted_path.join(&*path_sep);
-        print!("{:?}", encrypted_path);
         self.fs.mkdir(&*encrypted_path)
     }
 }

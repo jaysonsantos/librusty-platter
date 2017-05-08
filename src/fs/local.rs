@@ -51,6 +51,7 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
     }
 
     fn create(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
+        let path = try!(self.base_path.join(path).to_str());
         Ok(LocalFile::create_boxed(path)?)
     }
 }
