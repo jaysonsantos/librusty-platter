@@ -1,12 +1,16 @@
-use std::path::Path;
-use std::fs::{create_dir, remove_dir_all, remove_file, rename};
+use fs;
+use result::{Error, RustyPlatterResult};
 
-use fs::Filesystem;
-use result::RustyPlatterResult;
+use std::fs::{create_dir, remove_dir_all, remove_file, rename};
+use std::fs::File as StdFile;
+use std::io::Result as IoResult;
+use std::io::Write;
+use std::path::{Path, MAIN_SEPARATOR};
 
 /// Implementation of a local filesystem
+#[derive(Debug)]
 pub struct LocalFileSystem<'a> {
-    base_path: &'a Path,
+    pub base_path: &'a Path,
 }
 
 impl<'a> LocalFileSystem<'a> {
@@ -15,13 +19,23 @@ impl<'a> LocalFileSystem<'a> {
     }
 }
 
-impl<'a> Filesystem for LocalFileSystem<'a> {
-    fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
-        Ok(create_dir(self.base_path.join(path))?)
+impl<'a> fs::Filesystem for LocalFileSystem<'a> {
+    fn path_separator(&self) -> String {
+        let mut sep = String::new();
+        sep.push(MAIN_SEPARATOR);
+        sep
     }
+
+    fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
+        let real_path = self.base_path.join(path);
+        trace!("LocalFileSystem: mkdir path: {:?} -> {:?}", path, real_path);
+        Ok(create_dir(real_path)?)
+    }
+
     fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()> {
         Ok(rename(self.base_path.join(from), self.base_path.join(to))?)
     }
+
     fn rm(&self, path: &str) -> RustyPlatterResult<()> {
         let path = self.base_path.join(path);
         if path.is_dir() {
@@ -30,24 +44,74 @@ impl<'a> Filesystem for LocalFileSystem<'a> {
             Ok(remove_file(path)?)
         }
     }
+
     fn exists(&self, path: &str) -> bool {
         self.base_path.join(path).exists()
+    }
+
+    fn open(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
+        let path = self.base_path.join(path);
+        let path = path.to_str().ok_or(Error::InvalidPathName)?;
+        trace!("Opening {:?}", path);
+        Ok(LocalFile::open_boxed(path)?)
+    }
+
+    fn create(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
+        let path = self.base_path.join(path);
+        let path = path.to_str().ok_or(Error::InvalidPathName)?;
+        Ok(LocalFile::create_boxed(path)?)
+    }
+}
+
+pub struct LocalFile {
+    fd: StdFile,
+}
+
+impl LocalFile {
+    pub fn open(path: &str) -> RustyPlatterResult<Self> {
+        Ok(LocalFile { fd: StdFile::open(path)? })
+    }
+
+    pub fn open_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
+        Ok(Box::new(LocalFile::open(path)?))
+    }
+
+    pub fn create(path: &str) -> RustyPlatterResult<Self> {
+        Ok(LocalFile { fd: StdFile::create(path)? })
+    }
+
+    pub fn create_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
+        Ok(Box::new(LocalFile::create(path)?))
+    }
+}
+
+impl fs::File for LocalFile {}
+
+impl Write for LocalFile {
+    fn write(&mut self, content: &[u8]) -> IoResult<usize> {
+        Ok(self.fd.write(content)?)
+    }
+
+    fn flush(&mut self) -> IoResult<()> {
+        Ok(self.fd.flush()?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
-
-    use std::fs as std_fs;
+    extern crate env_logger;
 
     use self::tempdir::TempDir;
 
-    use ::fs::Filesystem;
-    use ::fs::local::LocalFileSystem;
+    use super::*;
+    use super::fs::*;
+    use std::fs as std_fs;
 
     #[test]
     fn test_mkdir() {
+        let _ = env_logger::init();
+        debug!("test_mkdir");
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
@@ -89,5 +153,14 @@ mod tests {
         std_fs::File::create(path.join("file")).unwrap();
         fs.mv("file", "file2").unwrap();
         assert!(path.join("file2").exists());
+    }
+
+    #[test]
+    fn test_write() {
+        let temp = TempDir::new("test_mkdir").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+        let mut file = fs.create("ab.txt").unwrap();
+        assert_eq!(file.write(b"a").unwrap(), 1 as usize);
     }
 }
