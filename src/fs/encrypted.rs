@@ -79,7 +79,7 @@ impl<'a> EncryptedFs<'a> {
 
     /// Decrypt already chunked slices and return the binary data
     pub fn decrypt_data(&self, data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
-        let opening_key = self.config.openning_key();
+        let opening_key = self.config.opening_key();
         let mut nonce = data.to_vec();
         let mut encrypted_data = nonce.split_off(opening_key.algorithm().nonce_len());
         let additional_data = [];
@@ -110,6 +110,7 @@ impl<'a> EncryptedFs<'a> {
 
 #[cfg(test)]
 mod tests {
+    extern crate env_logger;
     extern crate ring;
     extern crate tempdir;
 
@@ -156,13 +157,17 @@ mod tests {
 
     #[test]
     fn test_mkdir() {
-        let temp = TempDir::new("test_en_decrypt_name").unwrap();
+        let _ = env_logger::init();
+        debug!("encrypted.rs test_mkdir");
+        let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
-
+        debug!("{:?}", fs);
+        debug!("Start config");
         let config =
             Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
-                .unwrap();
+            .unwrap();
+        debug!("{:?}", config);
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
         encrypted.mkdir("abc").unwrap();
     }

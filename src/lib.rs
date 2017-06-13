@@ -1,4 +1,6 @@
 extern crate data_encoding;
+#[macro_use]
+extern crate log;
 extern crate ring;
 #[macro_use]
 extern crate serde_derive;

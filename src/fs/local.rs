@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::{Path, MAIN_SEPARATOR};
 
 /// Implementation of a local filesystem
+#[derive(Debug)]
 pub struct LocalFileSystem<'a> {
     pub base_path: &'a Path,
 }
@@ -26,7 +27,9 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
     }
 
     fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
-        Ok(create_dir(self.base_path.join(path))?)
+        let real_path = self.base_path.join(path);
+        trace!("LocalFileSystem: mkdir path: {:?} -> {:?}", path, real_path);
+        Ok(create_dir(real_path)?)
     }
 
     fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()> {
@@ -47,6 +50,9 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
     }
 
     fn open(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
+        let path = self.base_path.join(path);
+        let path = path.to_str().ok_or(Error::InvalidPathName)?;
+        trace!("Opening {:?}", path);
         Ok(LocalFile::open_boxed(path)?)
     }
 
@@ -94,6 +100,7 @@ impl Write for LocalFile {
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
+    extern crate env_logger;
 
     use self::tempdir::TempDir;
 
@@ -103,6 +110,8 @@ mod tests {
 
     #[test]
     fn test_mkdir() {
+        let _ = env_logger::init();
+        debug!("test_mkdir");
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
