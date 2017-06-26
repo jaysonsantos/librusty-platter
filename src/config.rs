@@ -45,26 +45,36 @@ impl Config {
 
     /// Create a new config with a custom random, mainly used with tests but could also be
     /// used to get some data from random.org for example
-    pub fn new_with_custom_random(password: &str,
-                                  iterations: u32,
-                                  fs: &Filesystem,
-                                  rand: Box<SecureRandom>)
-                                  -> RustyPlatterResult<Self> {
+    pub fn new_with_custom_random(
+        password: &str,
+        iterations: u32,
+        fs: &Filesystem,
+        rand: Box<SecureRandom>,
+    ) -> RustyPlatterResult<Self> {
         if iterations < MINIMUM_ITERATIONS {
-            trace!("Config cannot be generate because numer of iterations is too low {}", iterations);
+            trace!(
+                "Config cannot be generate because numer of iterations is too low {}",
+                iterations
+            );
             return Err(Error::IterationsNumberTooSmall);
         }
 
         let mut salt = [0u8; 16];
         rand.fill(&mut salt)?;
 
-        trace!("Generating new key with {} iterations and salt {:?}", iterations, salt);
+        trace!(
+            "Generating new key with {} iterations and salt {:?}",
+            iterations,
+            salt
+        );
         let mut key = [0; 32];
-        pbkdf2::derive(&pbkdf2::HMAC_SHA256,
-                       iterations,
-                       &salt,
-                       password.as_bytes(),
-                       &mut key);
+        pbkdf2::derive(
+            &pbkdf2::HMAC_SHA256,
+            iterations,
+            &salt,
+            password.as_bytes(),
+            &mut key,
+        );
 
         let keys = Keys {
             opening: OpeningKey::new(&CHACHA20_POLY1305, &key)?,

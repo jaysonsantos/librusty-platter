@@ -35,15 +35,17 @@ impl<'a> EncryptedFs<'a> {
 
     /// Encrypt a name and return it as base64 string
     pub fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
-        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes())?))
+        let sealing_key = self.config.sealing_key();
+        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
+        self.random.fill(&mut nonce)?;
+        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes(), &*nonce)?))
     }
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
     /// and encrypted data (input_data.len())
-    pub fn encrypt_data(&self, input_data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
+    pub fn encrypt_data(&self, input_data: &[u8], nonce: &[u8]) -> RustyPlatterResult<Vec<u8>> {
         let additional_data = [];
         let sealing_key = self.config.sealing_key();
-        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
         let mut output: Vec<u8> = vec![];
         let mut to_encrypt = input_data.to_vec();
 
@@ -55,16 +57,16 @@ impl<'a> EncryptedFs<'a> {
         let tag_len = sealing_key.algorithm().tag_len();
         to_encrypt.resize(input_data.len() + tag_len, 0);
 
-        // Fill nonce with random data
-        self.random.fill(&mut nonce)?;
         output.extend_from_slice(&nonce);
 
         // Don't truncate because we want to keep it as fixed size
-        seal_in_place(&sealing_key,
-                      &nonce,
-                      &additional_data,
-                      &mut to_encrypt,
-                      CHACHA20_POLY1305.tag_len())?;
+        seal_in_place(
+            &sealing_key,
+            &nonce,
+            &additional_data,
+            &mut to_encrypt,
+            CHACHA20_POLY1305.tag_len(),
+        )?;
 
         output.extend_from_slice(&to_encrypt);
         Ok(output)
@@ -83,17 +85,17 @@ impl<'a> EncryptedFs<'a> {
         let mut nonce = data.to_vec();
         let mut encrypted_data = nonce.split_off(opening_key.algorithm().nonce_len());
         let additional_data = [];
-        let decrypted = open_in_place(&opening_key,
-                                      &nonce,
-                                      &additional_data,
-                                      0,
-                                      &mut encrypted_data)
-                .map_err(|_| Error::InvalidEncodedName)?;
+        let decrypted = open_in_place(
+            &opening_key,
+            &nonce,
+            &additional_data,
+            0,
+            &mut encrypted_data,
+        ).map_err(|_| Error::InvalidEncodedName)?;
         Ok(decrypted.to_vec())
     }
 
-    /// Create an encrypted directory
-    pub fn mkdir(&self, name: &str) -> RustyPlatterResult<()> {
+    fn encrypt_path(&self, name: &str) -> RustyPlatterResult<String> {
         let path_sep = self.fs.path_separator();
         let path: Vec<&str> = name.split(&*path_sep)
             // Remove stuff like a//b
@@ -103,8 +105,22 @@ impl<'a> EncryptedFs<'a> {
         for part in &path {
             encrypted_path.push(self.encrypt_name(part)?);
         }
-        let encrypted_path = encrypted_path.join(&*path_sep);
+        Ok(encrypted_path.join(&*path_sep))
+    }
+
+    /// Create an encrypted directory
+    pub fn mkdir(&self, name: &str) -> RustyPlatterResult<()> {
+        let encrypted_path = self.encrypt_path(name)?;
         self.fs.mkdir(&*encrypted_path)
+    }
+
+    /// Check if a path exists
+    pub fn exists(&self, name: &str) -> bool {
+        if let Ok(encrypted_path) = self.encrypt_path(name) {
+            self.fs.exists(&*encrypted_path)
+        } else {
+            false
+        }
     }
 }
 
@@ -166,9 +182,28 @@ mod tests {
         debug!("Start config");
         let config =
             Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
-            .unwrap();
+                .unwrap();
         debug!("{:?}", config);
         let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
         encrypted.mkdir("abc").unwrap();
+        assert!(encrypted.exists("abc"));
+    }
+
+    #[test]
+    fn test_exists() {
+        let _ = env_logger::init();
+        debug!("encrypted.rs test_exists");
+        let temp = TempDir::new("test_exists").unwrap();
+        let path = temp.path();
+        let fs = LocalFileSystem::new(path.to_str().unwrap());
+        debug!("{:?}", fs);
+        debug!("Start config");
+        let config =
+            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
+                .unwrap();
+        debug!("{:?}", config);
+        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        encrypted.mkdir("abc").unwrap();
+        assert!(encrypted.exists("abc"));
     }
 }

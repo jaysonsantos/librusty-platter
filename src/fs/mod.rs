@@ -4,8 +4,7 @@ pub mod encrypted;
 use result::RustyPlatterResult;
 use std::io::Write;
 
-pub trait File: Write {
-}
+pub trait File: Write {}
 
 /// Basic filesystem trait
 pub trait Filesystem {
