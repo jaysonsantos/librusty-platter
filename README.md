@@ -9,3 +9,4 @@ This is also working as playground to learn more about encryption and rust so, I
 ## What works
 - Local directory initialization
 - Folder creation
+- Exist method
