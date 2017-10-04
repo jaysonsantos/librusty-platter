@@ -1,6 +1,5 @@
 use fs;
-use result::{Error, RustyPlatterResult};
-
+use result::{ErrorKind, Result};
 use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 use std::fs::File as StdFile;
 use std::io::Result as IoResult;
@@ -15,7 +14,9 @@ pub struct LocalFileSystem<'a> {
 
 impl<'a> LocalFileSystem<'a> {
     pub fn new(base_path: &'a str) -> Self {
-        LocalFileSystem { base_path: Path::new(base_path) }
+        LocalFileSystem {
+            base_path: Path::new(base_path),
+        }
     }
 }
 
@@ -26,17 +27,17 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         sep
     }
 
-    fn mkdir(&self, path: &str) -> RustyPlatterResult<()> {
+    fn mkdir(&self, path: &str) -> Result<()> {
         let real_path = self.base_path.join(path);
         trace!("LocalFileSystem: mkdir path: {:?} -> {:?}", path, real_path);
         Ok(create_dir(real_path)?)
     }
 
-    fn mv(&self, from: &str, to: &str) -> RustyPlatterResult<()> {
+    fn mv(&self, from: &str, to: &str) -> Result<()> {
         Ok(rename(self.base_path.join(from), self.base_path.join(to))?)
     }
 
-    fn rm(&self, path: &str) -> RustyPlatterResult<()> {
+    fn rm(&self, path: &str) -> Result<()> {
         let path = self.base_path.join(path);
         if path.is_dir() {
             Ok(remove_dir_all(path)?)
@@ -49,16 +50,20 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         self.base_path.join(path).exists()
     }
 
-    fn open(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
-        let path = self.base_path.join(path);
-        let path = path.to_str().ok_or(Error::InvalidPathName)?;
+    fn open(&self, path: &str) -> Result<Box<fs::File>> {
+        let joined_path = self.base_path.join(path);
+        let path = joined_path
+            .to_str()
+            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
         trace!("Opening {:?}", path);
         Ok(LocalFile::open_boxed(path)?)
     }
 
-    fn create(&self, path: &str) -> RustyPlatterResult<Box<fs::File>> {
-        let path = self.base_path.join(path);
-        let path = path.to_str().ok_or(Error::InvalidPathName)?;
+    fn create(&self, path: &str) -> Result<Box<fs::File>> {
+        let joined_path = self.base_path.join(path);
+        let path = joined_path
+            .to_str()
+            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
         Ok(LocalFile::create_boxed(path)?)
     }
 }
@@ -68,19 +73,23 @@ pub struct LocalFile {
 }
 
 impl LocalFile {
-    pub fn open(path: &str) -> RustyPlatterResult<Self> {
-        Ok(LocalFile { fd: StdFile::open(path)? })
+    pub fn open(path: &str) -> Result<Self> {
+        Ok(LocalFile {
+            fd: StdFile::open(path)?,
+        })
     }
 
-    pub fn open_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
+    pub fn open_boxed(path: &str) -> Result<Box<Self>> {
         Ok(Box::new(LocalFile::open(path)?))
     }
 
-    pub fn create(path: &str) -> RustyPlatterResult<Self> {
-        Ok(LocalFile { fd: StdFile::create(path)? })
+    pub fn create(path: &str) -> Result<Self> {
+        Ok(LocalFile {
+            fd: StdFile::create(path)?,
+        })
     }
 
-    pub fn create_boxed(path: &str) -> RustyPlatterResult<Box<Self>> {
+    pub fn create_boxed(path: &str) -> Result<Box<Self>> {
         Ok(Box::new(LocalFile::create(path)?))
     }
 }
@@ -99,11 +108,10 @@ impl Write for LocalFile {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
     extern crate env_logger;
+    extern crate tempdir;
 
     use self::tempdir::TempDir;
-
     use super::*;
     use super::fs::*;
     use std::fs as std_fs;
