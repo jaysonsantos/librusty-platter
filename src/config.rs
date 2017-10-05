@@ -1,10 +1,8 @@
 use fs::Filesystem;
-use result::{RustyPlatterResult, Error};
-
-use ring::aead::{SealingKey, OpeningKey, CHACHA20_POLY1305};
+use result::{ErrorKind, Result};
+use ring::aead::{CHACHA20_POLY1305, OpeningKey, SealingKey};
 use ring::pbkdf2;
 use ring::rand::{SecureRandom, SystemRandom};
-
 use serde_json;
 use std::fmt;
 
@@ -30,7 +28,7 @@ pub struct Config {
 
 impl Config {
     #![allow(dead_code)]
-    pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> RustyPlatterResult<Self> {
+    pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> Result<Self> {
         let rand = Box::new(SystemRandom::new());
         Self::new_with_custom_random(password, iterations, fs, rand)
     }
@@ -50,13 +48,13 @@ impl Config {
         iterations: u32,
         fs: &Filesystem,
         rand: Box<SecureRandom>,
-    ) -> RustyPlatterResult<Self> {
+    ) -> Result<Self> {
         if iterations < MINIMUM_ITERATIONS {
             trace!(
                 "Config cannot be generate because numer of iterations is too low {}",
                 iterations
             );
-            return Err(Error::IterationsNumberTooSmall);
+            bail!(ErrorKind::IterationsNumberTooSmall(iterations));
         }
 
         let mut salt = [0u8; 16];
@@ -93,16 +91,16 @@ impl Config {
     }
 
     /// Save current config to FS_ROOT/.rusty-platter.json
-    pub fn save(&self, fs: &Filesystem) -> RustyPlatterResult<()> {
+    pub fn save(&self, fs: &Filesystem) -> Result<()> {
         let mut config_file = fs.create(CONFIG_PATH)?;
         trace!("Saving config file.");
-        serde_json::to_writer(&mut config_file, &self).unwrap();
+        serde_json::to_writer(&mut config_file, &self).unwrap(); // TODO Add conversion
         Ok(())
     }
 }
 
 impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Config {{ iterations: {} }}", self.iterations)
     }
 }

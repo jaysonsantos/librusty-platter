@@ -1,10 +1,9 @@
 use config::Config;
 use data_encoding::BASE32;
 use fs::Filesystem;
-use result::{RustyPlatterResult, Error};
-
-use ring::aead::{CHACHA20_POLY1305, seal_in_place, open_in_place};
-use ring::rand::{SystemRandom, SecureRandom};
+use result::{ErrorKind, Result, ResultExt};
+use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
+use ring::rand::{SecureRandom, SystemRandom};
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
@@ -34,7 +33,7 @@ impl<'a> EncryptedFs<'a> {
     }
 
     /// Encrypt a name and return it as base64 string
-    pub fn encrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+    pub fn encrypt_name(&self, name: &str) -> Result<String> {
         let sealing_key = self.config.sealing_key();
         let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
         self.random.fill(&mut nonce)?;
@@ -43,14 +42,14 @@ impl<'a> EncryptedFs<'a> {
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
     /// and encrypted data (input_data.len())
-    pub fn encrypt_data(&self, input_data: &[u8], nonce: &[u8]) -> RustyPlatterResult<Vec<u8>> {
+    pub fn encrypt_data(&self, input_data: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
         let additional_data = [];
         let sealing_key = self.config.sealing_key();
         let mut output: Vec<u8> = vec![];
         let mut to_encrypt = input_data.to_vec();
 
         if to_encrypt.is_empty() {
-            return Err(Error::InvalidPathName);
+            bail!(ErrorKind::InvalidPathName("".to_owned()));
         }
 
         // Initialize space for the tag
@@ -73,14 +72,14 @@ impl<'a> EncryptedFs<'a> {
     }
 
     /// Decrypt a base64 encoded string returning a string
-    pub fn decrypt_name(&self, name: &str) -> RustyPlatterResult<String> {
+    pub fn decrypt_name(&self, name: &str) -> Result<String> {
         let data = BASE32.decode(name.as_bytes())?;
         let decrypted = self.decrypt_data(&*data)?;
-        String::from_utf8(decrypted.to_vec()).map_err(|_| Error::InvalidEncodedName)
+        String::from_utf8(decrypted.to_vec()).chain_err(|| ErrorKind::InvalidEncodedName)
     }
 
     /// Decrypt already chunked slices and return the binary data
-    pub fn decrypt_data(&self, data: &[u8]) -> RustyPlatterResult<Vec<u8>> {
+    pub fn decrypt_data(&self, data: &[u8]) -> Result<Vec<u8>> {
         let opening_key = self.config.opening_key();
         let mut nonce = data.to_vec();
         let mut encrypted_data = nonce.split_off(opening_key.algorithm().nonce_len());
@@ -91,11 +90,11 @@ impl<'a> EncryptedFs<'a> {
             &additional_data,
             0,
             &mut encrypted_data,
-        ).map_err(|_| Error::InvalidEncodedName)?;
+        ).chain_err(|| ErrorKind::InvalidEncodedName)?;
         Ok(decrypted.to_vec())
     }
 
-    fn encrypt_path(&self, name: &str) -> RustyPlatterResult<String> {
+    fn encrypt_path(&self, name: &str) -> Result<String> {
         let path_sep = self.fs.path_separator();
         let path: Vec<&str> = name.split(&*path_sep)
             // Remove stuff like a//b
@@ -109,7 +108,7 @@ impl<'a> EncryptedFs<'a> {
     }
 
     /// Create an encrypted directory
-    pub fn mkdir(&self, name: &str) -> RustyPlatterResult<()> {
+    pub fn mkdir(&self, name: &str) -> Result<()> {
         let encrypted_path = self.encrypt_path(name)?;
         self.fs.mkdir(&*encrypted_path)
     }
@@ -131,10 +130,8 @@ mod tests {
     extern crate tempdir;
 
     use self::tempdir::TempDir;
-
     use super::*;
     use fs::local::LocalFileSystem;
-
     use ring::error::Unspecified;
     use std::io::Write;
 
@@ -150,7 +147,7 @@ mod tests {
     }
 
     impl SecureRandom for DumbRandom {
-        fn fill(&self, mut buf: &mut [u8]) -> Result<(), Unspecified> {
+        fn fill(&self, mut buf: &mut [u8]) -> ::std::result::Result<(), Unspecified> {
             buf.write(&self.dumb_data()).unwrap();
             Ok(())
         }
