@@ -16,8 +16,8 @@ impl<'a> EncryptedFs<'a> {
     #![allow(dead_code)]
     fn new(fs: &'a Filesystem, config: Config) -> Self {
         EncryptedFs {
-            fs: fs,
-            config: config,
+            fs,
+            config,
             random: Box::new(SystemRandom::new()),
         }
     }
@@ -25,11 +25,7 @@ impl<'a> EncryptedFs<'a> {
     #[allow(dead_code)]
     fn with_custom_random(fs: &'a Filesystem, config: Config, random: Box<SecureRandom>) -> Self {
         // Constructor mainly used for tests where we can mock random values
-        EncryptedFs {
-            fs: fs,
-            config: config,
-            random: random,
-        }
+        EncryptedFs { fs, config, random }
     }
 
     /// Encrypt a name and return it as base64 string

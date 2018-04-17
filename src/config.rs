@@ -1,6 +1,7 @@
 use fs::Filesystem;
 use result::{ErrorKind, Result};
 use ring::aead::{CHACHA20_POLY1305, OpeningKey, SealingKey};
+use ring::digest;
 use ring::pbkdf2;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde_json;
@@ -67,7 +68,7 @@ impl Config {
         );
         let mut key = [0; 32];
         pbkdf2::derive(
-            &pbkdf2::HMAC_SHA256,
+            &digest::SHA256,
             iterations,
             &salt,
             password.as_bytes(),
@@ -80,8 +81,8 @@ impl Config {
         };
 
         let config = Config {
-            salt: salt,
-            iterations: iterations,
+            salt,
+            iterations,
             keys: Some(keys),
         };
 
