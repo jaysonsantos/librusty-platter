@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_mkdir() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         debug!("encrypted.rs test_mkdir");
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_exists() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         debug!("encrypted.rs test_exists");
         let temp = TempDir::new("test_exists").unwrap();
         let path = temp.path();
