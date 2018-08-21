@@ -1,7 +1,7 @@
 use fs;
 use result::{ErrorKind, Result};
-use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 use std::fs::File as StdFile;
+use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 use std::io::Result as IoResult;
 use std::io::Write;
 use std::path::{Path, MAIN_SEPARATOR};
@@ -112,13 +112,13 @@ mod tests {
     extern crate tempdir;
 
     use self::tempdir::TempDir;
-    use super::*;
     use super::fs::*;
+    use super::*;
     use std::fs as std_fs;
 
     #[test]
     fn test_mkdir() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         debug!("test_mkdir");
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();

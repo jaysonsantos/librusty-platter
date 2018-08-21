@@ -132,26 +132,10 @@ mod tests {
     use self::tempdir::TempDir;
     use super::*;
     use fs::local::LocalFileSystem;
-    use ring::error::Unspecified;
-    use std::io::Write;
+    use ring::test::rand::FixedByteRandom;
 
     const PASSWORD: &'static str = "password";
     const ITERATIONS: u32 = 10_000;
-
-    struct DumbRandom {}
-
-    impl DumbRandom {
-        fn dumb_data(&self) -> Vec<u8> {
-            (0..100).collect()
-        }
-    }
-
-    impl SecureRandom for DumbRandom {
-        fn fill(&self, mut buf: &mut [u8]) -> ::std::result::Result<(), Unspecified> {
-            buf.write(&self.dumb_data()).unwrap();
-            Ok(())
-        }
-    }
 
     #[test]
     fn test_en_decrypt_name() {
@@ -159,10 +143,14 @@ mod tests {
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
 
-        let config =
-            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
-                .unwrap();
-        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        let config = Config::new_with_custom_random(
+            PASSWORD,
+            ITERATIONS,
+            &fs,
+            Box::new(FixedByteRandom { byte: 0 }),
+        ).unwrap();
+        let encrypted =
+            EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         let data = "path name";
         let encrypted_name = encrypted.encrypt_name(data).unwrap();
         assert_eq!(encrypted.decrypt_name(&*encrypted_name).unwrap(), data);
@@ -170,36 +158,44 @@ mod tests {
 
     #[test]
     fn test_mkdir() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         debug!("encrypted.rs test_mkdir");
         let temp = TempDir::new("test_mkdir").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
         debug!("{:?}", fs);
         debug!("Start config");
-        let config =
-            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
-                .unwrap();
+        let config = Config::new_with_custom_random(
+            PASSWORD,
+            ITERATIONS,
+            &fs,
+            Box::new(FixedByteRandom { byte: 0 }),
+        ).unwrap();
         debug!("{:?}", config);
-        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        let encrypted =
+            EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         encrypted.mkdir("abc").unwrap();
         assert!(encrypted.exists("abc"));
     }
 
     #[test]
     fn test_exists() {
-        let _ = env_logger::init();
+        let _ = env_logger::try_init();
         debug!("encrypted.rs test_exists");
         let temp = TempDir::new("test_exists").unwrap();
         let path = temp.path();
         let fs = LocalFileSystem::new(path.to_str().unwrap());
         debug!("{:?}", fs);
         debug!("Start config");
-        let config =
-            Config::new_with_custom_random(PASSWORD, ITERATIONS, &fs, Box::new(DumbRandom {}))
-                .unwrap();
+        let config = Config::new_with_custom_random(
+            PASSWORD,
+            ITERATIONS,
+            &fs,
+            Box::new(FixedByteRandom { byte: 0 }),
+        ).unwrap();
         debug!("{:?}", config);
-        let encrypted = EncryptedFs::with_custom_random(&fs, config, Box::new(DumbRandom {}));
+        let encrypted =
+            EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         encrypted.mkdir("abc").unwrap();
         assert!(encrypted.exists("abc"));
     }
