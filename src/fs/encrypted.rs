@@ -16,8 +16,8 @@ impl<'a> EncryptedFs<'a> {
     #![allow(dead_code)]
     fn new(fs: &'a Filesystem, config: Config) -> Self {
         EncryptedFs {
-            fs: fs,
-            config: config,
+            fs,
+            config,
             random: Box::new(SystemRandom::new()),
         }
     }
@@ -25,14 +25,10 @@ impl<'a> EncryptedFs<'a> {
     #[allow(dead_code)]
     fn with_custom_random(fs: &'a Filesystem, config: Config, random: Box<SecureRandom>) -> Self {
         // Constructor mainly used for tests where we can mock random values
-        EncryptedFs {
-            fs: fs,
-            config: config,
-            random: random,
-        }
+        EncryptedFs { fs, config, random }
     }
 
-    /// Encrypt a name and return it as base64 string
+    /// Encrypt a name and return it as base32 string
     pub fn encrypt_name(&self, name: &str) -> Result<String> {
         let sealing_key = self.config.sealing_key();
         let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
@@ -71,7 +67,7 @@ impl<'a> EncryptedFs<'a> {
         Ok(output)
     }
 
-    /// Decrypt a base64 encoded string returning a string
+    /// Decrypt a base32 encoded string returning a string
     pub fn decrypt_name(&self, name: &str) -> Result<String> {
         let data = BASE32.decode(name.as_bytes())?;
         let decrypted = self.decrypt_data(&*data)?;
@@ -134,7 +130,7 @@ mod tests {
     use fs::local::LocalFileSystem;
     use ring::test::rand::FixedByteRandom;
 
-    const PASSWORD: &'static str = "password";
+    const PASSWORD: &str = "password";
     const ITERATIONS: u32 = 10_000;
 
     #[test]

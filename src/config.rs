@@ -8,7 +8,7 @@ use serde_json;
 use std::fmt;
 
 const MINIMUM_ITERATIONS: u32 = 10_000;
-const CONFIG_PATH: &'static str = ".rusty-platter.json";
+const CONFIG_PATH: &str = ".rusty-platter.json";
 
 pub struct Keys {
     pub opening: OpeningKey,
@@ -82,7 +82,7 @@ impl Config {
 
         let config = Config {
             salt: salt,
-            iterations: iterations,
+            iterations,
             keys: Some(keys),
         };
 

@@ -30,20 +30,23 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
     fn mkdir(&self, path: &str) -> Result<()> {
         let real_path = self.base_path.join(path);
         trace!("LocalFileSystem: mkdir path: {:?} -> {:?}", path, real_path);
-        Ok(create_dir(real_path)?)
+        create_dir(real_path)?;
+        Ok(())
     }
 
     fn mv(&self, from: &str, to: &str) -> Result<()> {
-        Ok(rename(self.base_path.join(from), self.base_path.join(to))?)
+        rename(self.base_path.join(from), self.base_path.join(to))?;
+        Ok(())
     }
 
     fn rm(&self, path: &str) -> Result<()> {
         let path = self.base_path.join(path);
         if path.is_dir() {
-            Ok(remove_dir_all(path)?)
+            remove_dir_all(path)?;
         } else {
-            Ok(remove_file(path)?)
+            remove_file(path)?;
         }
+        Ok(())
     }
 
     fn exists(&self, path: &str) -> bool {
@@ -54,7 +57,7 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         let joined_path = self.base_path.join(path);
         let path = joined_path
             .to_str()
-            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
+            .ok_or_else(|| ErrorKind::InvalidPathName(path.to_string()))?;
         trace!("Opening {:?}", path);
         Ok(LocalFile::open_boxed(path)?)
     }
@@ -63,7 +66,7 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         let joined_path = self.base_path.join(path);
         let path = joined_path
             .to_str()
-            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
+            .ok_or_else(|| ErrorKind::InvalidPathName(path.to_string()))?;
         Ok(LocalFile::create_boxed(path)?)
     }
 }
@@ -102,7 +105,8 @@ impl Write for LocalFile {
     }
 
     fn flush(&mut self) -> IoResult<()> {
-        Ok(self.fd.flush()?)
+        self.fd.flush()?;
+        Ok(())
     }
 }
 
