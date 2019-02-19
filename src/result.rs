@@ -1,5 +1,7 @@
 use data_encoding;
+use error_chain::error_chain;
 use ring;
+
 use std::io;
 
 error_chain! {

@@ -1,7 +1,6 @@
 extern crate data_encoding;
 #[macro_use]
 extern crate error_chain;
-#[macro_use]
 extern crate log;
 extern crate ring;
 extern crate serde;
@@ -13,6 +12,6 @@ pub mod config;
 pub mod fs;
 pub mod result;
 
-pub use config::Config;
-pub use fs::encrypted::EncryptedFs;
-pub use result::{Error, Result};
+pub use crate::config::Config;
+pub use crate::fs::encrypted::EncryptedFs;
+pub use crate::result::{Error, Result};
