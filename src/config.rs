@@ -1,5 +1,7 @@
-use fs::Filesystem;
-use result::{ErrorKind, Result};
+use crate::fs::Filesystem;
+use crate::result::{ErrorKind, Result};
+
+use log::trace;
 use ring::aead::{OpeningKey, SealingKey, CHACHA20_POLY1305};
 use ring::digest;
 use ring::pbkdf2;

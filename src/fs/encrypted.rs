@@ -1,7 +1,8 @@
-use config::Config;
+use crate::config::Config;
+use crate::fs::Filesystem;
+use crate::result::{ErrorKind, Result, ResultExt};
+
 use data_encoding::BASE32;
-use fs::Filesystem;
-use result::{ErrorKind, Result, ResultExt};
 use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
 use ring::rand::{SecureRandom, SystemRandom};
 
@@ -90,13 +91,15 @@ impl<'a> EncryptedFs<'a> {
             &additional_data,
             0,
             &mut encrypted_data,
-        ).chain_err(|| ErrorKind::InvalidEncodedName)?;
+        )
+        .chain_err(|| ErrorKind::InvalidEncodedName)?;
         Ok(decrypted.to_vec())
     }
 
     fn encrypt_path(&self, name: &str) -> Result<String> {
         let path_sep = self.fs.path_separator();
-        let path: Vec<&str> = name.split(&*path_sep)
+        let path: Vec<&str> = name
+            .split(&*path_sep)
             // Remove stuff like a//b
             .filter(|name| !name.is_empty())
             .collect();
@@ -125,14 +128,14 @@ impl<'a> EncryptedFs<'a> {
 
 #[cfg(test)]
 mod tests {
-    extern crate env_logger;
-    extern crate ring;
-    extern crate tempdir;
+    use crate::fs::local::LocalFileSystem;
+    use crate::Config;
+    use crate::EncryptedFs;
 
-    use self::tempdir::TempDir;
-    use super::*;
-    use fs::local::LocalFileSystem;
     use ring::test::rand::FixedByteRandom;
+    use tempdir::TempDir;
+
+    use log::debug;
 
     const PASSWORD: &'static str = "password";
     const ITERATIONS: u32 = 10_000;
@@ -148,7 +151,8 @@ mod tests {
             ITERATIONS,
             &fs,
             Box::new(FixedByteRandom { byte: 0 }),
-        ).unwrap();
+        )
+        .unwrap();
         let encrypted =
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         let data = "path name";
@@ -170,7 +174,8 @@ mod tests {
             ITERATIONS,
             &fs,
             Box::new(FixedByteRandom { byte: 0 }),
-        ).unwrap();
+        )
+        .unwrap();
         debug!("{:?}", config);
         let encrypted =
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
@@ -192,7 +197,8 @@ mod tests {
             ITERATIONS,
             &fs,
             Box::new(FixedByteRandom { byte: 0 }),
-        ).unwrap();
+        )
+        .unwrap();
         debug!("{:?}", config);
         let encrypted =
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));

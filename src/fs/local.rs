@@ -1,5 +1,8 @@
-use fs;
-use result::{ErrorKind, Result};
+use crate::fs;
+use crate::result::{ErrorKind, Result};
+
+use log::trace;
+
 use std::fs::File as StdFile;
 use std::fs::{create_dir, remove_dir_all, remove_file, rename};
 use std::io::Result as IoResult;
@@ -110,6 +113,8 @@ impl Write for LocalFile {
 mod tests {
     extern crate env_logger;
     extern crate tempdir;
+
+    use log::debug;
 
     use self::tempdir::TempDir;
     use super::fs::*;

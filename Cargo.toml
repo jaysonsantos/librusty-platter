@@ -4,6 +4,7 @@ license = "MIT"
 name = "librusty-platter"
 readme = "README.md"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
 data-encoding = "2.1.1"

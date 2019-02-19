@@ -1,7 +1,7 @@
-pub mod local;
 pub mod encrypted;
+pub mod local;
 
-use result::Result;
+use crate::result::Result;
 use std::io::Write;
 
 pub trait File: Write {}
