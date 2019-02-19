@@ -1,10 +1,16 @@
+use std::io::{self, Write};
+
 use crate::config::Config;
-use crate::fs::Filesystem;
+use crate::fs::{File, Filesystem};
 use crate::result::{ErrorKind, Result, ResultExt};
 
 use data_encoding::BASE32;
 use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
 use ring::rand::{SecureRandom, SystemRandom};
+
+const NONCE_SIZE: usize = 12;
+pub const USER_BLOCK_SIZE: usize = 64 * 1024 + NONCE_SIZE;
+pub const BLOCK_SIZE: usize = USER_BLOCK_SIZE + NONCE_SIZE;
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
@@ -35,17 +41,16 @@ impl<'a> EncryptedFs<'a> {
 
     /// Encrypt a name and return it as base64 string
     pub fn encrypt_name(&self, name: &str) -> Result<String> {
-        let sealing_key = self.config.sealing_key();
-        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
-        self.random.fill(&mut nonce)?;
-        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes(), &*nonce)?))
+        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes())?))
     }
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
     /// and encrypted data (input_data.len())
-    pub fn encrypt_data(&self, input_data: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
+    pub fn encrypt_data(&self, input_data: &[u8]) -> Result<Vec<u8>> {
         let additional_data = [];
         let sealing_key = self.config.sealing_key();
+        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
+        self.random.fill(&mut nonce)?;
         let mut output: Vec<u8> = vec![];
         let mut to_encrypt = input_data.to_vec();
 
@@ -124,10 +129,70 @@ impl<'a> EncryptedFs<'a> {
             false
         }
     }
+
+    pub fn create(&self, path: &str) -> Result<Box<EncryptedFile>> {
+        let encrypted_path = self.encrypt_name(path)?;
+        Ok(Box::new(EncryptedFile::new(
+            self.fs.create(&encrypted_path)?,
+            self,
+        )))
+    }
+}
+
+pub struct EncryptedFile<'a, 'b> {
+    filesystem: &'a EncryptedFs<'b>,
+    file: Box<File>,
+    buffer: [u8; USER_BLOCK_SIZE],
+    buffer_filled_length: usize,
+}
+
+impl<'a, 'b> EncryptedFile<'a, 'b> {
+    pub fn new(file: Box<File>, filesystem: &'a EncryptedFs<'b>) -> Self {
+        EncryptedFile {
+            filesystem,
+            file,
+            buffer: [0; USER_BLOCK_SIZE],
+            buffer_filled_length: 0,
+        }
+    }
+
+    fn write_chunk(&mut self, chunk: &[u8]) -> io::Result<usize> {
+        if self.buffer_filled_length != 0 {
+            let bytes_to_write = chunk.len() - self.buffer.len();
+            let (difference, rest) = chunk.split_at(bytes_to_write);
+            let (_, buffer) = self.buffer.split_at_mut(self.buffer_filled_length);
+            buffer.copy_from_slice(difference);
+            self.file
+                .write(&self.filesystem.encrypt_data(&self.buffer).unwrap())?;
+            self.buffer.copy_from_slice(rest);
+            self.buffer_filled_length = rest.len();
+            return Ok(chunk.len());
+        }
+
+        self.file
+            .write(&self.filesystem.encrypt_data(chunk).unwrap())?;
+        Ok(chunk.len())
+    }
+}
+
+impl<'a, 'b> Write for EncryptedFile<'a, 'b> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut written_data = 0;
+        for chunk in buf.chunks(USER_BLOCK_SIZE) {
+            written_data += self.write_chunk(chunk)?;
+        }
+        Ok(written_data)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use crate::fs::local::LocalFileSystem;
     use crate::Config;
     use crate::EncryptedFs;
@@ -204,5 +269,26 @@ mod tests {
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         encrypted.mkdir("abc").unwrap();
         assert!(encrypted.exists("abc"));
+    }
+
+    #[test]
+    fn test_create() {
+        let _ = env_logger::try_init();
+        let temp = TempDir::new("test_create").unwrap();
+        let path = temp.path();
+        let fs = dbg!(LocalFileSystem::new(path.to_str().unwrap()));
+        let config = dbg!(Config::new_with_custom_random(
+            PASSWORD,
+            ITERATIONS,
+            &fs,
+            Box::new(FixedByteRandom { byte: 0 }),
+        ))
+        .unwrap();
+        let encrypted =
+            EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
+        let mut f = encrypted.create("abc").unwrap();
+        assert_eq!(f.write("hello".as_bytes()).unwrap(), 5);
+        assert!(encrypted.exists("abc"));
+        dbg!(temp.path());
     }
 }
