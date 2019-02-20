@@ -1,16 +1,13 @@
-use std::io::{self, Write};
+pub mod file;
 
 use crate::config::Config;
-use crate::fs::{File, Filesystem};
+use crate::fs::encrypted::file::EncryptedFile;
+use crate::fs::Filesystem;
 use crate::result::{ErrorKind, Result, ResultExt};
 
 use data_encoding::BASE32;
 use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
 use ring::rand::{SecureRandom, SystemRandom};
-
-const NONCE_SIZE: usize = 12;
-pub const USER_BLOCK_SIZE: usize = 64 * 1024;
-pub const BLOCK_SIZE: usize = USER_BLOCK_SIZE + NONCE_SIZE;
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
@@ -65,7 +62,7 @@ impl<'a> EncryptedFs<'a> {
         output.extend_from_slice(&nonce);
 
         // Don't truncate because we want to keep it as fixed size
-        seal_in_place(
+        let output_length = seal_in_place(
             &sealing_key,
             &nonce,
             &additional_data,
@@ -73,7 +70,7 @@ impl<'a> EncryptedFs<'a> {
             CHACHA20_POLY1305.tag_len(),
         )?;
 
-        output.extend_from_slice(&to_encrypt);
+        output.extend_from_slice(&to_encrypt[..output_length]);
         Ok(output)
     }
 
@@ -139,75 +136,8 @@ impl<'a> EncryptedFs<'a> {
     }
 }
 
-pub struct EncryptedFile<'a, 'b> {
-    filesystem: &'a EncryptedFs<'b>,
-    file: Box<File>,
-    buffer: [u8; USER_BLOCK_SIZE],
-    buffer_filled_length: usize,
-}
-
-impl<'a, 'b> EncryptedFile<'a, 'b> {
-    pub fn new(file: Box<File>, filesystem: &'a EncryptedFs<'b>) -> Self {
-        EncryptedFile {
-            filesystem,
-            file,
-            buffer: [0; USER_BLOCK_SIZE],
-            buffer_filled_length: 0,
-        }
-    }
-
-    fn write_chunk(&mut self, chunk: &[u8]) -> io::Result<usize> {
-        if self.buffer_filled_length != 0 {
-            let bytes_to_write = (USER_BLOCK_SIZE - self.buffer_filled_length).min(chunk.len());
-            let (difference, rest) = chunk.split_at(bytes_to_write);
-            let (buffer, _) = self.buffer[self.buffer_filled_length..].split_at_mut(bytes_to_write);
-            buffer.copy_from_slice(difference);
-            self.buffer_filled_length += bytes_to_write;
-
-            if self.buffer_filled_length >= USER_BLOCK_SIZE {
-                assert_eq!(
-                    self.file
-                        .write(&self.filesystem.encrypt_data(&self.buffer).unwrap())?,
-                    BLOCK_SIZE
-                );
-                let (buffer, _) = self.buffer.split_at_mut(rest.len());
-                buffer.copy_from_slice(rest);
-                self.buffer_filled_length = rest.len();
-            }
-            return Ok(chunk.len());
-        }
-
-        if chunk.len() < USER_BLOCK_SIZE {
-            let (buffer, _) = self.buffer.split_at_mut(chunk.len());
-            buffer.copy_from_slice(chunk);
-            self.buffer_filled_length = chunk.len();
-            return Ok(chunk.len());
-        }
-
-        self.file
-            .write(&self.filesystem.encrypt_data(chunk).unwrap())?;
-        Ok(chunk.len())
-    }
-}
-
-impl<'a, 'b> Write for EncryptedFile<'a, 'b> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut written_data = 0;
-        for chunk in buf.chunks(USER_BLOCK_SIZE) {
-            written_data += self.write_chunk(chunk)?;
-        }
-        Ok(written_data)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.file.flush()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
     use crate::fs::local::LocalFileSystem;
     use crate::Config;
     use crate::EncryptedFs;
@@ -283,35 +213,6 @@ mod tests {
         let encrypted =
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         encrypted.mkdir("abc").unwrap();
-        assert!(encrypted.exists("abc"));
-    }
-
-    #[test]
-    fn test_create() {
-        let _ = env_logger::try_init();
-        let temp = TempDir::new("test_create").unwrap();
-        let path = temp.path();
-        let fs = dbg!(LocalFileSystem::new(path.to_str().unwrap()));
-        let config = dbg!(Config::new_with_custom_random(
-            PASSWORD,
-            ITERATIONS,
-            &fs,
-            Box::new(FixedByteRandom { byte: 0 }),
-        ))
-        .unwrap();
-        let encrypted =
-            EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
-        let mut f = encrypted.create("abc").unwrap();
-        assert_eq!(f.write("he".as_bytes()).unwrap(), 2);
-        assert_eq!(f.write("llo".as_bytes()).unwrap(), 3);
-        assert_eq!(
-            f.write(" ".repeat(64 * 1024 - 5).as_bytes()).unwrap(),
-            64 * 1024 - 5
-        );
-        // assert_eq!(f.write(" ".repeat(64).as_bytes()).unwrap(), 64);
-        dbg!(temp.path());
-        // f.flush().unwrap();
-        // ::std::thread::sleep(::std::time::Duration::from_secs(60));
         assert!(encrypted.exists("abc"));
     }
 }
