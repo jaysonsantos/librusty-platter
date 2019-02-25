@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::fs::encrypted::file::EncryptedFile;
 use crate::fs::Filesystem;
 use crate::result::{ErrorKind, Result, ResultExt};
+use std::iter;
 
 use data_encoding::BASE32;
 use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
@@ -11,6 +12,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 const NONCE_SIZE: usize = 12;
 const TAG_SIZE: usize = 16;
+const BLANK_NONCE_TAG_SIZE: [u8; NONCE_SIZE + TAG_SIZE] = [0; NONCE_SIZE + TAG_SIZE];
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
@@ -23,8 +25,8 @@ impl<'a> EncryptedFs<'a> {
     #![allow(dead_code)]
     fn new(fs: &'a Filesystem, config: Config) -> Self {
         EncryptedFs {
-            fs: fs,
-            config: config,
+            fs,
+            config,
             random: Box::new(SystemRandom::new()),
         }
     }
@@ -33,44 +35,49 @@ impl<'a> EncryptedFs<'a> {
     fn with_custom_random(fs: &'a Filesystem, config: Config, random: Box<SecureRandom>) -> Self {
         // Constructor mainly used for tests where we can mock random values
         EncryptedFs {
-            fs: fs,
-            config: config,
-            random: random,
+            fs,
+            config,
+            random,
         }
     }
 
     /// Encrypt a name and return it as base64 string
     pub fn encrypt_name(&self, name: &str) -> Result<String> {
-        if name.is_empty() {
-            bail!(ErrorKind::InvalidPathName("".to_owned()));
-        }
-
-        let mut buffer = Vec::with_capacity(name.len() + NONCE_SIZE + TAG_SIZE);
-        buffer.copy_from_slice(name.as_bytes());
-        self.encrypt_data(&mut buffer)?;
-        Ok(BASE32.encode(&buffer))
+        let sealing_key = self.config.sealing_key();
+        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
+        self.random.fill(&mut nonce)?;
+        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes(), &*nonce)?))
     }
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
     /// and encrypted data (input_data.len())
-    pub fn encrypt_data(&self, input_data: &mut Vec<u8>) -> Result<usize> {
+    pub fn encrypt_data(&self, input_data: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
         let additional_data = [];
         let sealing_key = self.config.sealing_key();
-        let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
-        self.random.fill(&mut nonce)?;
+        let mut output: Vec<u8> = vec![];
+        let mut to_encrypt = input_data.to_vec();
 
-        input_data.extend_from_slice(&nonce);
+        if to_encrypt.is_empty() {
+            bail!(ErrorKind::InvalidPathName("".to_owned()));
+        }
+
+        // Initialize space for the tag
+        let tag_len = sealing_key.algorithm().tag_len();
+        to_encrypt.resize(input_data.len() + tag_len, 0);
+
+        output.extend_from_slice(&nonce);
 
         // Don't truncate because we want to keep it as fixed size
-        let output_length = seal_in_place(
+        seal_in_place(
             &sealing_key,
             &nonce,
             &additional_data,
-            &mut input_data[..],
+            &mut to_encrypt,
             CHACHA20_POLY1305.tag_len(),
         )?;
 
-        Ok(output_length)
+        output.extend_from_slice(&to_encrypt);
+        Ok(output)
     }
 
     /// Decrypt a base64 encoded string returning a string
@@ -105,7 +112,7 @@ impl<'a> EncryptedFs<'a> {
             .filter(|name| !name.is_empty())
             .collect();
         let mut encrypted_path = vec![];
-        for part in &path {
+        for part in path {
             encrypted_path.push(self.encrypt_name(part)?);
         }
         Ok(encrypted_path.join(&*path_sep))
@@ -166,6 +173,7 @@ mod tests {
             EncryptedFs::with_custom_random(&fs, config, Box::new(FixedByteRandom { byte: 0 }));
         let data = "path name";
         let encrypted_name = encrypted.encrypt_name(data).unwrap();
+        dbg!(&encrypted_name);
         assert_eq!(encrypted.decrypt_name(&*encrypted_name).unwrap(), data);
     }
 

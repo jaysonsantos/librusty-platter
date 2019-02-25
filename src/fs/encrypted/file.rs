@@ -1,15 +1,19 @@
 use crate::fs::encrypted::{EncryptedFs, NONCE_SIZE, TAG_SIZE};
 use crate::fs::File;
 use std::io::{self, Write};
+use std::iter;
 
 pub const USER_BLOCK_SIZE: usize = 64 * 1024;
 pub const BLOCK_SIZE: usize = USER_BLOCK_SIZE + NONCE_SIZE + TAG_SIZE;
 
+// TODO: Decrease the amount of copy operations
+
 pub struct EncryptedFile<'a, 'b> {
     filesystem: &'a EncryptedFs<'b>,
     file: Box<File>,
-    buffer: Vec<u8>,
+    buffer: [u8; BLOCK_SIZE],
     buffer_filled_length: usize,
+    current_nonce: [u8; NONCE_SIZE],
 }
 
 impl<'a, 'b> EncryptedFile<'a, 'b> {
@@ -17,8 +21,9 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
         EncryptedFile {
             filesystem,
             file,
-            buffer: Vec::with_capacity(BLOCK_SIZE),
+            buffer: [0; BLOCK_SIZE],
             buffer_filled_length: 0,
+            current_nonce: [0; NONCE_SIZE],
         }
     }
 
@@ -31,8 +36,12 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
             self.buffer_filled_length += bytes_to_write;
 
             if self.buffer_filled_length >= USER_BLOCK_SIZE {
-                self.filesystem.encrypt_data(&mut self.buffer).unwrap();
-                assert_eq!(self.file.write(&self.buffer)?, BLOCK_SIZE);
+                self.filesystem.random.fill(&mut self.current_nonce);
+                let encrypted_data = self
+                    .filesystem
+                    .encrypt_data(&self.buffer, &self.current_nonce)
+                    .unwrap();
+                assert_eq!(self.file.write(&encrypted_data)?, BLOCK_SIZE);
                 let (buffer, _) = self.buffer.split_at_mut(rest.len());
                 buffer.copy_from_slice(rest);
                 self.buffer_filled_length = rest.len();
@@ -49,8 +58,12 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
 
         let buffer = &mut self.buffer[..USER_BLOCK_SIZE];
         buffer.copy_from_slice(chunk);
-        self.filesystem.encrypt_data(&mut self.buffer).unwrap();
-        assert_eq!(self.file.write(&self.buffer)?, BLOCK_SIZE);
+        self.filesystem.random.fill(&mut self.current_nonce);
+        let encrypted_data = self
+            .filesystem
+            .encrypt_data(&self.buffer, &self.current_nonce)
+            .unwrap();
+        assert_eq!(self.file.write(&encrypted_data)?, BLOCK_SIZE);
         Ok(chunk.len())
     }
 }
