@@ -1,16 +1,14 @@
-use crate::fs::encrypted::EncryptedFs;
+use crate::fs::encrypted::{EncryptedFs, NONCE_SIZE, TAG_SIZE};
 use crate::fs::File;
 use std::io::{self, Write};
 
-const NONCE_SIZE: usize = 12;
-const TAG_SIZE: usize = 16;
 pub const USER_BLOCK_SIZE: usize = 64 * 1024;
 pub const BLOCK_SIZE: usize = USER_BLOCK_SIZE + NONCE_SIZE + TAG_SIZE;
 
 pub struct EncryptedFile<'a, 'b> {
     filesystem: &'a EncryptedFs<'b>,
     file: Box<File>,
-    buffer: [u8; USER_BLOCK_SIZE],
+    buffer: Vec<u8>,
     buffer_filled_length: usize,
 }
 
@@ -19,7 +17,7 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
         EncryptedFile {
             filesystem,
             file,
-            buffer: [0; USER_BLOCK_SIZE],
+            buffer: Vec::with_capacity(BLOCK_SIZE),
             buffer_filled_length: 0,
         }
     }
@@ -33,11 +31,8 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
             self.buffer_filled_length += bytes_to_write;
 
             if self.buffer_filled_length >= USER_BLOCK_SIZE {
-                assert_eq!(
-                    self.file
-                        .write(&self.filesystem.encrypt_data(&self.buffer).unwrap())?,
-                    BLOCK_SIZE
-                );
+                self.filesystem.encrypt_data(&mut self.buffer).unwrap();
+                assert_eq!(self.file.write(&self.buffer)?, BLOCK_SIZE);
                 let (buffer, _) = self.buffer.split_at_mut(rest.len());
                 buffer.copy_from_slice(rest);
                 self.buffer_filled_length = rest.len();
@@ -52,11 +47,10 @@ impl<'a, 'b> EncryptedFile<'a, 'b> {
             return Ok(chunk.len());
         }
 
-        assert_eq!(
-            self.file
-                .write(&self.filesystem.encrypt_data(chunk).unwrap())?,
-            BLOCK_SIZE
-        );
+        let buffer = &mut self.buffer[..USER_BLOCK_SIZE];
+        buffer.copy_from_slice(chunk);
+        self.filesystem.encrypt_data(&mut self.buffer).unwrap();
+        assert_eq!(self.file.write(&self.buffer)?, BLOCK_SIZE);
         Ok(chunk.len())
     }
 }

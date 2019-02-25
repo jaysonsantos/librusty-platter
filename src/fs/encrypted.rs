@@ -9,6 +9,9 @@ use data_encoding::BASE32;
 use ring::aead::{open_in_place, seal_in_place, CHACHA20_POLY1305};
 use ring::rand::{SecureRandom, SystemRandom};
 
+const NONCE_SIZE: usize = 12;
+const TAG_SIZE: usize = 16;
+
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
     fs: &'a Filesystem,
@@ -38,40 +41,36 @@ impl<'a> EncryptedFs<'a> {
 
     /// Encrypt a name and return it as base64 string
     pub fn encrypt_name(&self, name: &str) -> Result<String> {
-        Ok(BASE32.encode(&self.encrypt_data(name.as_bytes())?))
+        if name.is_empty() {
+            bail!(ErrorKind::InvalidPathName("".to_owned()));
+        }
+
+        let mut buffer = Vec::with_capacity(name.len() + NONCE_SIZE + TAG_SIZE);
+        buffer.copy_from_slice(name.as_bytes());
+        self.encrypt_data(&mut buffer)?;
+        Ok(BASE32.encode(&buffer))
     }
 
     /// Encrypt already chunked slices returning a binary vector with it's nonce (12 bytes)
     /// and encrypted data (input_data.len())
-    pub fn encrypt_data(&self, input_data: &[u8]) -> Result<Vec<u8>> {
+    pub fn encrypt_data(&self, input_data: &mut Vec<u8>) -> Result<usize> {
         let additional_data = [];
         let sealing_key = self.config.sealing_key();
         let mut nonce = vec![0; sealing_key.algorithm().nonce_len()];
         self.random.fill(&mut nonce)?;
-        let mut output: Vec<u8> = vec![];
-        let mut to_encrypt = input_data.to_vec();
 
-        if to_encrypt.is_empty() {
-            bail!(ErrorKind::InvalidPathName("".to_owned()));
-        }
-
-        // Initialize space for the tag
-        let tag_len = sealing_key.algorithm().tag_len();
-        to_encrypt.resize(input_data.len() + tag_len, 0);
-
-        output.extend_from_slice(&nonce);
+        input_data.extend_from_slice(&nonce);
 
         // Don't truncate because we want to keep it as fixed size
         let output_length = seal_in_place(
             &sealing_key,
             &nonce,
             &additional_data,
-            &mut to_encrypt,
+            &mut input_data[..],
             CHACHA20_POLY1305.tag_len(),
         )?;
 
-        output.extend_from_slice(&to_encrypt[..output_length]);
-        Ok(output)
+        Ok(output_length)
     }
 
     /// Decrypt a base64 encoded string returning a string
