@@ -10,7 +10,7 @@ use serde_json;
 use std::fmt;
 
 const MINIMUM_ITERATIONS: u32 = 10_000;
-const CONFIG_PATH: &'static str = ".rusty-platter.json";
+const CONFIG_PATH: &str = ".rusty-platter.json";
 
 pub struct Keys {
     pub opening: OpeningKey,
@@ -31,7 +31,7 @@ pub struct Config {
 
 impl Config {
     #![allow(dead_code)]
-    pub fn new(password: &str, iterations: u32, fs: &Filesystem) -> Result<Self> {
+    pub fn new(password: &str, iterations: u32, fs: &dyn Filesystem) -> Result<Self> {
         let rand = Box::new(SystemRandom::new());
         Self::new_with_custom_random(password, iterations, fs, rand)
     }
@@ -49,8 +49,8 @@ impl Config {
     pub fn new_with_custom_random(
         password: &str,
         iterations: u32,
-        fs: &Filesystem,
-        rand: Box<SecureRandom>,
+        fs: &dyn Filesystem,
+        rand: Box<dyn SecureRandom>,
     ) -> Result<Self> {
         if iterations < MINIMUM_ITERATIONS {
             trace!(
@@ -83,8 +83,8 @@ impl Config {
         };
 
         let config = Config {
-            salt: salt,
-            iterations: iterations,
+            salt,
+            iterations,
             keys: Some(keys),
         };
 
@@ -94,7 +94,7 @@ impl Config {
     }
 
     /// Save current config to FS_ROOT/.rusty-platter.json
-    pub fn save(&self, fs: &Filesystem) -> Result<()> {
+    pub fn save(&self, fs: &dyn Filesystem) -> Result<()> {
         let mut config_file = fs.create(CONFIG_PATH)?;
         trace!("Saving config file.");
         serde_json::to_writer(&mut config_file, &self).unwrap(); // TODO Add conversion

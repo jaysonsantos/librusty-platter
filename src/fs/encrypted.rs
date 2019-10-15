@@ -8,29 +8,29 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 /// Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted.
 pub struct EncryptedFs<'a> {
-    fs: &'a Filesystem,
+    fs: &'a dyn Filesystem,
     config: Config,
-    random: Box<SecureRandom>,
+    random: Box<dyn SecureRandom>,
 }
 
 impl<'a> EncryptedFs<'a> {
     #![allow(dead_code)]
-    fn new(fs: &'a Filesystem, config: Config) -> Self {
+    fn new(fs: &'a dyn Filesystem, config: Config) -> Self {
         EncryptedFs {
-            fs: fs,
-            config: config,
+            fs,
+            config,
             random: Box::new(SystemRandom::new()),
         }
     }
 
     #[allow(dead_code)]
-    fn with_custom_random(fs: &'a Filesystem, config: Config, random: Box<SecureRandom>) -> Self {
+    fn with_custom_random(
+        fs: &'a dyn Filesystem,
+        config: Config,
+        random: Box<dyn SecureRandom>,
+    ) -> Self {
         // Constructor mainly used for tests where we can mock random values
-        EncryptedFs {
-            fs: fs,
-            config: config,
-            random: random,
-        }
+        EncryptedFs { fs, config, random }
     }
 
     /// Encrypt a name and return it as base64 string
@@ -137,7 +137,7 @@ mod tests {
 
     use log::debug;
 
-    const PASSWORD: &'static str = "password";
+    const PASSWORD: &str = "password";
     const ITERATIONS: u32 = 10_000;
 
     #[test]
