@@ -13,6 +13,6 @@ pub trait Filesystem {
     fn mv(&self, from: &str, to: &str) -> Result<()>;
     fn rm(&self, path: &str) -> Result<()>;
     fn exists(&self, path: &str) -> bool;
-    fn open(&self, path: &str) -> Result<Box<File>>;
-    fn create(&self, path: &str) -> Result<Box<File>>;
+    fn open(&self, path: &str) -> Result<Box<dyn File>>;
+    fn create(&self, path: &str) -> Result<Box<dyn File>>;
 }

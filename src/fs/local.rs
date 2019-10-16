@@ -53,20 +53,20 @@ impl<'a> fs::Filesystem for LocalFileSystem<'a> {
         self.base_path.join(path).exists()
     }
 
-    fn open(&self, path: &str) -> Result<Box<fs::File>> {
+    fn open(&self, path: &str) -> Result<Box<dyn fs::File>> {
         let joined_path = self.base_path.join(path);
         let path = joined_path
             .to_str()
-            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
+            .ok_or_else(|| ErrorKind::InvalidPathName(path.to_string()))?;
         trace!("Opening {:?}", path);
         Ok(LocalFile::open_boxed(path)?)
     }
 
-    fn create(&self, path: &str) -> Result<Box<fs::File>> {
+    fn create(&self, path: &str) -> Result<Box<dyn fs::File>> {
         let joined_path = self.base_path.join(path);
         let path = joined_path
             .to_str()
-            .ok_or(ErrorKind::InvalidPathName(path.to_string()))?;
+            .ok_or_else(|| ErrorKind::InvalidPathName(path.to_string()))?;
         Ok(LocalFile::create_boxed(path)?)
     }
 }
