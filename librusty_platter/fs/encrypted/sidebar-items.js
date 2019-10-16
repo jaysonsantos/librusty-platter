@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["EncryptedFs","Struct that deals with a `Filesystem` implementation writing encrypted and reading decrypted."]]});
